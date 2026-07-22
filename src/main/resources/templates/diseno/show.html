@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head><title>Diseno — <span th:text="${pedido.codigo}">COD</span></title></head>
+<body>
+<div layout:fragment="content">
+
+    <style>
+        .btn-icon-sm { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.5rem; flex-shrink: 0; color: #fff; }
+        .btn-icon-sm:active { filter: brightness(0.85); }
+        .btn-icon-sm:focus, .btn-icon-sm:focus-visible { outline: 0 none !important; }
+    </style>
+
+    <div x-data="{
+        showSuccess: ${showSuccess},
+        uploadModal: false,
+        viewerOpen: false,
+        viewerIndex: 0,
+        viewerTab: 'ref',
+        viewerRef: [[${viewerRefFiles}]],
+        viewerDis: [[${viewerDisFiles}]],
+        get viewerFiles() { return this.viewerTab === 'ref' ? this.viewerRef : this.viewerDis },
+        get viewerTotal() { return this.viewerFiles.length },
+        get currentFile() { return this.viewerFiles[this.viewerIndex] },
+        get esImagen() {
+            if (!this.currentFile) return false;
+            return ['image/png','image/jpeg','image/jpg','image/gif','image/svg+xml','image/webp'].includes(this.currentFile.mime);
+        },
+        switchViewerTab(t) { this.viewerTab = t; this.viewerIndex = 0; },
+        prevFile() { if (this.viewerIndex > 0) this.viewerIndex-- },
+        nextFile() { if (this.viewerIndex < this.viewerTotal - 1) this.viewerIndex++ },
+        eliminarArchivoDiseno(id, index) {
+            if (!confirm('Eliminar este archivo?')) return;
+            fetch('[[@{/diseno/archivo/{id}(id=' + id + ')'}]]', {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=&quot;_csrf&quot;]').getAttribute('content') }
+            }).then(r => r.json()).then(data => {
+                if (data.ok) {
+                    this.viewerDis.splice(index, 1);
+                    if (this.viewerTab === 'dis' && this.viewerIndex >= this.viewerDis.length && this.viewerIndex > 0) this.viewerIndex--;
+                }
+            });
+        }
+    }">
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-6 shadow-sm">
+            <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Cliente</p>
+                    <p class="mt-1 text-[#2d2b24]" th:text="${pedido.nombreCliente}">Cliente</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Estado diseno</p>
+                    <span th:if="${pedido.estadoPersonalizacion == 'en_diseno'}" class="mt-1 inline-block rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">En diseno</span>
+                    <span th:elseif="${pedido.estadoPersonalizacion == 'en_revision'}" class="mt-1 inline-block rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">En revision</span>
+                    <span th:unless="${pedido.estadoPersonalizacion == 'en_diseno' or pedido.estadoPersonalizacion == 'en_revision'}" class="mt-1 inline-block rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-medium text-[#6a5122]" th:text="${#strings.replace(pedido.estadoPersonalizacion ?: 'sin_iniciar', '_', ' ')}">Estado</span>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Tipo producto</p>
+                    <p class="mt-1 text-[#2d2b24]" th:text="${pedido.tipoProducto}">Tipo</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Cantidad</p>
+                    <p class="mt-1 text-[#2d2b24]" th:text="${pedido.productos.![cantidad].reduce(0, #a + #b) ?: pedido.cantidad}">0</p>
+                </div>
+            </div>
+            <th:block th:if="${pedido.observacionesPersonalizacion != null and pedido.observacionesPersonalizacion != ''}">
+                <div class="mt-4">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Observaciones</p>
+                    <p class="mt-1 text-[#2d2b24]" th:text="${pedido.observacionesPersonalizacion}">Observaciones</p>
+                </div>
+            </th:block>
+            <th:block th:if="${!pedido.productos.isEmpty()}">
+                <div class="mt-5 overflow-x-auto rounded-xl border border-[#e5dec8]">
+                    <table class="w-full text-sm">
+                        <thead><tr class="bg-[#faf8f2] text-left text-xs font-semibold uppercase tracking-wider text-[#6a5122]"><th class="px-3 py-2">#</th><th class="px-3 py-2">Nombre</th><th class="px-3 py-2">Descripcion</th><th class="px-3 py-2">Archivos referencia</th></tr></thead>
+                        <tbody>
+                            <tr th:each="pp, idx : ${pedido.productos}" class="border-t border-[#efeee9]">
+                                <td class="px-3 py-2 text-center text-[#999]" th:text="${idx.count}">1</td>
+                                <td class="px-3 py-2 font-medium text-[#2d2b24]" th:text="${pp.nombre}">Nombre</td>
+                                <td class="px-3 py-2 text-[#4a4026]" th:text="${pp.descripcion} ?: '-'">-</td>
+                                <td class="px-3 py-2">
+                                    <th:block th:if="${!pp.archivos.isEmpty()}">
+                                        <div class="flex flex-wrap gap-1">
+                                            <a th:each="a : ${pp.archivos}" th:href="@{'/storage/' + ${a.archivoPath}}" target="_blank" class="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 hover:bg-amber-200" th:title="${a.nombreOriginal}">
+                                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                <span th:text="${#strings.abbreviate(a.nombreOriginal, 25)}">archivo</span>
+                                            </a>
+                                        </div>
+                                    </th:block>
+                                    <span th:unless="${!pp.archivos.isEmpty()}" class="text-[#bbb]">-</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </th:block>
+            <div class="mt-5">
+                <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Archivos de diseno subidos</p>
+                <div class="mt-1">
+                    <th:block th:if="${!pedido.archivosDiseno.isEmpty()}">
+                        <div class="flex flex-wrap gap-2">
+                            <a th:each="archivo : ${pedido.archivosDiseno}" th:href="@{'/storage/' + ${archivo.archivoPath}}" target="_blank" class="inline-flex items-center gap-1 rounded-lg border border-[#e5dec8] px-3 py-1.5 text-sm text-[#6a5122] hover:bg-[#faf8f2]">
+                                <span th:text="${archivo.nombreOriginal}">archivo</span>
+                                <span class="text-[#bbb]" th:text="'(' + ${#numbers.formatDecimal(archivo.tamanoBytes / 1024, 1, 0)} + ' KB)'">(0 KB)</span>
+                            </a>
+                        </div>
+                    </th:block>
+                    <p th:unless="${!pedido.archivosDiseno.isEmpty()}" class="text-[#bbb]">-</p>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-2">
+                <button type="button" @click="viewerOpen = true; viewerIndex = 0" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700" title="Ver modelo"><img th:src="@{/icons/VerModelo-Blanco.png}" alt="Ver modelo" class="h-4 w-4 object-contain pointer-events-none"></button>
+                <button type="button" @click="uploadModal = true" class="btn-icon-sm bg-amber-600 hover:bg-amber-700" title="Subir diseno"><img th:src="@{/icons/Subir-Blanco.png}" alt="Subir diseno" class="h-4 w-4 object-contain pointer-events-none"></button>
+                <a th:href="@{/diseno}" class="btn-icon-sm bg-[#555] hover:bg-[#333]" title="Volver"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg></a>
+            </div>
+        </div>
+
+        <!-- Viewer -->
+        <div x-show="viewerOpen" x-on:keydown.escape.window="viewerOpen = false" x-cloak @click.self="viewerOpen = false" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="relative mx-4 w-full max-w-3xl rounded-2xl bg-[#1a1a1a] p-4 shadow-xl">
+                <div class="mb-3 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-white/80" th:text="${pedido.codigo}">COD</h3>
+                    <button type="button" @click="viewerOpen = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar"><img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none"></button>
+                </div>
+                <div class="mb-3 flex justify-center gap-2">
+                    <button type="button" @click="switchViewerTab('ref')" :class="viewerTab === 'ref' ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'" class="rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors">Referencia <span x-show="viewerRef.length > 0" x-text="'(' + viewerRef.length + ')'" class="ml-1 opacity-70"></span></button>
+                    <button type="button" @click="switchViewerTab('dis')" :class="viewerTab === 'dis' ? 'bg-sky-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'" class="rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors">Diseno <span x-show="viewerDis.length > 0" x-text="'(' + viewerDis.length + ')'" class="ml-1 opacity-70"></span></button>
+                </div>
+                <template x-if="viewerTotal === 0"><div class="flex h-64 items-center justify-center text-white/50">No hay archivos en esta seccion.</div></template>
+                <template x-if="viewerTotal > 0"><div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="prevFile()" :disabled="viewerIndex === 0" class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 disabled:opacity-30 disabled:cursor-not-allowed"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+                        <div class="mx-auto flex h-80 w-full items-center justify-center overflow-hidden rounded-xl bg-black/40">
+                            <template x-if="esImagen"><img :src="currentFile.url" :alt="currentFile.nombre" class="max-h-full max-w-full object-contain"></template>
+                            <template x-if="!esImagen"><div class="flex flex-col items-center gap-3 text-center text-white/70"><svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><p class="text-sm" x-text="currentFile.nombre"></p><a :href="currentFile.url" target="_blank" class="inline-flex items-center gap-1 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/30">Descargar archivo</a></div></template>
+                        </div>
+                        <button type="button" @click="nextFile()" :disabled="viewerIndex === viewerTotal - 1" class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40 disabled:opacity-30 disabled:cursor-not-allowed"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+                    </div>
+                    <div class="mt-3 flex items-center justify-center gap-3 text-xs text-white/60"><span x-text="`${viewerIndex + 1} de ${viewerTotal}`"></span><span class="text-white/30">|</span><span x-text="currentFile?.producto || ''"></span><span class="text-white/30">|</span><span x-text="currentFile?.nombre || ''" class="max-w-[200px] truncate"></span></div>
+                    <div class="mt-2 flex justify-center gap-1"><template x-for="(_, i) in viewerFiles" :key="i"><button type="button" @click="viewerIndex = i" :class="i === viewerIndex ? 'bg-amber-500' : 'bg-white/20 hover:bg-white/40'" class="h-1.5 w-6 rounded-full transition-colors"></button></template></div>
+                    <div x-show="viewerTab === 'dis' &amp;&amp; currentFile?.id" class="mt-3 flex justify-center gap-2">
+                        <a :href="currentFile?.url" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/30 transition"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Descargar</a>
+                        <button type="button" @click="eliminarArchivoDiseno(currentFile.id, viewerIndex)" class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition"><img th:src="@{/icons/Eliminar-Blanco.ico}" alt="" class="h-3.5 w-3.5 object-contain pointer-events-none"> Eliminar</button>
+                    </div>
+                </div></template>
+            </div>
+        </div>
+
+        <!-- Upload Modal -->
+        <div x-show="uploadModal" x-on:keydown.escape.window="uploadModal = false" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div @click.outside="uploadModal = false" class="mx-4 w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Subir diseno</h3>
+                    <button type="button" @click="uploadModal = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar"><img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none"></button>
+                </div>
+                <form th:action="@{/diseno/{id}(id=${pedido.id})}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="_method" value="PUT"/>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-[#2d2b24]">Archivos de diseno</label>
+                        <input type="file" name="archivos_diseno[]" multiple accept=".cdr,.pdf,.png,.jpg,.jpeg,.svg,.ai,.eps,.psd,.webp" class="block w-full rounded-lg border border-[#d5d0c0] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-amber-800 hover:file:bg-amber-200">
+                        <p class="mt-1 text-xs text-[#999]">Max 10MB c/u. cdr, pdf, png, jpg, svg, ai, eps, psd, webp</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-[#2d2b24]">Accion</label>
+                        <div class="flex gap-3">
+                            <label class="flex items-center gap-2 rounded-lg border border-[#d5d0c0] px-4 py-2.5 cursor-pointer has-[:checked]:border-amber-600 has-[:checked]:bg-amber-50">
+                                <input type="radio" name="estado_personalizacion" value="en_diseno" th:checked="${pedido.estadoPersonalizacion != 'en_revision'}" class="text-amber-600 accent-amber-600">
+                                <span class="text-sm font-medium text-[#2d2b24]">Solo subir archivos</span>
+                            </label>
+                            <label class="flex items-center gap-2 rounded-lg border border-[#d5d0c0] px-4 py-2.5 cursor-pointer has-[:checked]:border-sky-600 has-[:checked]:bg-sky-50">
+                                <input type="radio" name="estado_personalizacion" value="en_revision" th:checked="${pedido.estadoPersonalizacion == 'en_revision'}" class="text-sky-600 accent-sky-600">
+                                <span class="text-sm font-medium text-[#2d2b24]">Subir y notificar</span>
+                            </label>
+                        </div>
+                        <p class="mt-1 text-xs text-[#999]">"Subir y notificar" envia a revision para que el vendedor lo vea.</p>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" @click="uploadModal = false" class="rounded-xl border border-[#d5d0c0] px-4 py-2 text-sm font-medium text-[#555] hover:bg-[#f5f3ed]">Cancelar</button>
+                        <button type="submit" class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700">Subir archivos</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal exito -->
+        <template x-teleport="body">
+            <div x-show="showSuccess" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="showSuccess = false"></div>
+                <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white px-16 pt-12 pb-12 text-center shadow-xl">
+                        <div class="mx-auto mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100"><img th:src="@{/icons/Valido-Verde.png}" alt="Valido" class="h-8 w-8 object-contain pointer-events-none" /></div>
+                        <h3 class="text-lg font-semibold text-gray-900" th:text="${ok}">Exito</h3>
+                        <button type="button" @click="showSuccess = false" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#111] py-3 text-sm font-semibold text-white hover:bg-[#262626]" style="padding-left:48px;padding-right:48px">Entendido</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+</div>
+</body>
+</html>

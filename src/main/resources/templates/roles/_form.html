@@ -1,0 +1,34 @@
+<div class="grid gap-4 md:grid-cols-2">
+    <div>
+        <label for="nombre" class="mb-2 block text-sm font-medium text-[#4d4026]">Nombre del rol</label>
+        <input id="nombre" name="nombre" type="text" th:value="${rol != null ? rol.nombre : ''}" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12]" placeholder="Ejemplo: caja" />
+        <p th:if="${#fields.hasErrors('nombre')}" th:errors="nombre" class="mt-1 text-sm text-rose-600"></p>
+    </div>
+
+    <div>
+        <label for="activo" class="mb-2 block text-sm font-medium text-[#4d4026]">Estado</label>
+        <select id="activo" name="activo" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12]">
+            <option value="1" th:selected="${activoRol == 1}">Activo</option>
+            <option value="0" th:selected="${activoRol == 0}">Inactivo</option>
+        </select>
+        <p th:if="${#fields.hasErrors('activo')}" th:errors="activo" class="mt-1 text-sm text-rose-600"></p>
+    </div>
+</div>
+
+<div class="mt-4">
+    <label for="descripcion" class="mb-2 block text-sm font-medium text-[#4d4026]">Descripcion</label>
+    <textarea id="descripcion" name="descripcion" rows="2" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12]" placeholder="Descripcion corta del rol" th:text="${rol != null ? rol.descripcion : ''}"></textarea>
+    <p th:if="${#fields.hasErrors('descripcion')}" th:errors="descripcion" class="mt-1 text-sm text-rose-600"></p>
+</div>
+
+<div class="mt-4">
+    <p class="mb-2 block text-sm font-medium text-[#4d4026]">Permisos del rol</p>
+    <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <label th:each="permiso : ${permisos}" class="flex items-center gap-2 rounded-xl border border-[#e5dec8] bg-[#fffdf7] px-3 py-2 text-sm text-[#3f3420]">
+            <input type="checkbox" name="permisos" th:value="${permiso.id}" th:checked="${#lists.contains(seleccionados, permiso.id)}" class="rounded border-[#b9943d] text-[#b9943d] focus:ring-[#b9943d]" />
+            <span th:text="${permiso.nombre}"></span>
+        </label>
+    </div>
+    <p th:if="${#fields.hasErrors('permisos')}" th:errors="permisos" class="mt-1 text-sm text-rose-600"></p>
+    <p th:if="${#fields.hasErrors('permisos[*]')}" class="mt-1 text-sm text-rose-600" th:utext="${#fields.errors('permisos[*]')}"></p>
+</div>

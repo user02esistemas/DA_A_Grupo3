@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
+<head><title>Usuarios - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+    <style>
+        .btn-icon:focus-visible,
+        .btn-icon:focus,
+        .btn-icon-sm:focus-visible,
+        .btn-icon-sm:focus {
+            outline: 0 none !important;
+        }
+        .btn-icon:active,
+        .btn-icon-sm:active {
+            filter: brightness(0.85);
+        }
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .btn-icon.is-active {
+            filter: brightness(0.8);
+        }
+        .btn-icon-sm {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+    </style>
+
+    <div
+        class="space-y-5"
+        x-data="{
+            modalNuevo: false,
+            modalRoles: false,
+            puedeGestionarRoles: [[${puedeGestionarRoles}]],
+            cargandoRoles: false,
+            roles: [],
+            permisos: [],
+            mensajeRoles: '',
+            errorRoles: false,
+            editandoRolId: null,
+            rolForm: {
+                nombre: '',
+                descripcion: '',
+                activo: true,
+                permisos: [],
+            },
+            get csrf() {
+                return document.querySelector('meta[name=_csrf]')?.content || '';
+            },
+            get csrfHeader() {
+                return document.querySelector('meta[name=_csrf_header]')?.content || 'X-CSRF-TOKEN';
+            },
+            async abrirModalRoles() {
+                this.modalRoles = true;
+                if (this.roles.length === 0 || this.permisos.length === 0) {
+                    await this.cargarRoles();
+                }
+            },
+            abrirNuevo() {
+                this.modalNuevo = true;
+                setTimeout(() => {
+                    const f = document.getElementById('nuevo-form');
+                    if (!f) return;
+                    f.querySelectorAll('input:not([type=hidden]), select').forEach(el => {
+                        if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                        else el.value = '';
+                    });
+                }, 50);
+            },
+            cerrarNuevo() {
+                this.modalNuevo = false;
+            },
+            cerrarModalRoles() {
+                this.modalRoles = false;
+                this.limpiarFormularioRol();
+                this.mensajeRoles = '';
+                this.errorRoles = false;
+            },
+            limpiarFormularioRol() {
+                this.editandoRolId = null;
+                this.rolForm = {
+                    nombre: '',
+                    descripcion: '',
+                    activo: true,
+                    permisos: [],
+                };
+            },
+            async cargarRoles() {
+                this.cargandoRoles = true;
+                try {
+                    const response = await fetch('[[@{/roles/panel-data}]]', {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    const data = await response.json();
+                    if (data?.ok) {
+                        this.roles = data.roles || [];
+                        this.permisos = data.permisos || [];
+                        this.mensajeRoles = '';
+                        this.errorRoles = false;
+                        return;
+                    }
+                    this.mensajeRoles = 'No se pudo cargar la gestion de roles.';
+                    this.errorRoles = true;
+                } catch (e) {
+                    this.mensajeRoles = 'Error al cargar roles.';
+                    this.errorRoles = true;
+                } finally {
+                    this.cargandoRoles = false;
+                }
+            },
+            editarRol(rol) {
+                this.editandoRolId = rol.id;
+                this.rolForm.nombre = rol.nombre || '';
+                this.rolForm.descripcion = rol.descripcion || '';
+                this.rolForm.activo = !!rol.activo;
+                this.rolForm.permisos = (rol.permisos || []).map((p) => p.id);
+                this.mensajeRoles = 'Editando rol: ' + (rol.nombre || '');
+                this.errorRoles = false;
+            },
+            async guardarRol() {
+                if (!this.puedeGestionarRoles) return;
+                this.mensajeRoles = '';
+                this.errorRoles = false;
+
+                const payload = {
+                    nombre: (this.rolForm.nombre || '').trim(),
+                    descripcion: (this.rolForm.descripcion || '').trim(),
+                    activo: this.rolForm.activo ? 1 : 0,
+                    permisos: this.rolForm.permisos,
+                };
+
+                if (payload.nombre === '') {
+                    this.mensajeRoles = 'El nombre del rol es obligatorio.';
+                    this.errorRoles = true;
+                    return;
+                }
+
+                const editando = !!this.editandoRolId;
+                const url = editando
+                    ? '/roles/' + this.editandoRolId
+                    : '[[@{/roles}]]';
+                const method = editando ? 'PUT' : 'POST';
+
+                try {
+                    const headers = {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    };
+                    headers[this.csrfHeader] = this.csrf;
+                    const response = await fetch(url, {
+                        method,
+                        headers,
+                        body: JSON.stringify(payload),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data?.ok) {
+                        this.mensajeRoles = data?.message || 'No se pudo guardar el rol.';
+                        this.errorRoles = true;
+                        return;
+                    }
+
+                    this.mensajeRoles = data.message || 'Rol guardado correctamente.';
+                    this.errorRoles = false;
+                    this.limpiarFormularioRol();
+                    await this.cargarRoles();
+                } catch (e) {
+                    this.mensajeRoles = 'Error al guardar el rol.';
+                    this.errorRoles = true;
+                }
+            },
+            async eliminarRol(rol) {
+                if (!this.puedeGestionarRoles) return;
+                if (!rol?.id) return;
+                if (!confirm('Deseas eliminar el rol ' + rol.nombre + '?')) return;
+
+                try {
+                    const headers = { 'Accept': 'application/json' };
+                    headers[this.csrfHeader] = this.csrf;
+                    const response = await fetch('/roles/' + rol.id, {
+                        method: 'DELETE',
+                        headers,
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data?.ok) {
+                        this.mensajeRoles = data?.message || 'No se pudo eliminar el rol.';
+                        this.errorRoles = true;
+                        return;
+                    }
+
+                    this.mensajeRoles = data.message || 'Rol eliminado correctamente.';
+                    this.errorRoles = false;
+                    if (this.editandoRolId === rol.id) {
+                        this.limpiarFormularioRol();
+                    }
+                    await this.cargarRoles();
+                } catch (e) {
+                    this.mensajeRoles = 'Error al eliminar rol.';
+                    this.errorRoles = true;
+                }
+            },
+            togglePermiso(id) {
+                const idx = this.rolForm.permisos.indexOf(id);
+                if (idx === -1) {
+                    this.rolForm.permisos.push(id);
+                } else {
+                    this.rolForm.permisos.splice(idx, 1);
+                }
+            }
+        }"
+    >
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm" x-data="{ filtrosAbiertos: false, rolFiltro: '[[${filtroRol}]]', activoFiltro: '[[${filtroActivo}]]' }">
+            <div class="flex items-center gap-2">
+                <form id="search-form" method="GET" th:action="@{/usuarios}" class="flex min-w-0 flex-1">
+                    <input type="text" name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm" placeholder="Buscar por nombre o correo" />
+                </form>
+                <button type="submit" form="search-form" class="btn-icon bg-blue-600 hover:bg-blue-700" title="Buscar">
+                    <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain" />
+                </button>
+                <a th:if="${(filtroRol != null and filtroRol != '') or (filtroActivo != null and filtroActivo != '') or (busqueda != null and busqueda != '')}" th:href="@{/usuarios}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+
+                <button
+                    type="button"
+                    @click="filtrosAbiertos = !filtrosAbiertos"
+                    class="btn-icon bg-sky-500 hover:bg-sky-600"
+                    title="Filtrar"
+                    :class="{ 'is-active': filtrosAbiertos || [[${(filtroRol != null and filtroRol != '') or (filtroActivo != null and filtroActivo != '')}]] }"
+                >
+                    <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain" />
+                </button>
+
+                <span sec:authorize="hasAuthority('roles.ver')">
+                    <button
+                        type="button"
+                        @click="abrirModalRoles()"
+                        class="btn-icon bg-violet-600 hover:bg-violet-700"
+                        title="Gestionar roles"
+                        aria-label="Gestionar roles"
+                    >
+                        <img th:src="@{/icons/roles.ico}" alt="Roles" class="h-5 w-5 object-contain" />
+                    </button>
+                </span>
+
+                <span sec:authorize="hasAuthority('usuarios.gestionar')">
+                    <button type="button" @click="abrirNuevo()" class="btn-icon" style="background-color:#09090f;color:white" title="Nuevo usuario">
+                        <img th:src="@{/icons/nuevo.ico}" alt="Nuevo" class="h-5 w-5 object-contain" />
+                    </button>
+                </span>
+            </div>
+
+            <form x-show="filtrosAbiertos" x-transition method="GET" th:action="@{/usuarios}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
+                <input type="hidden" name="q" th:value="${busqueda}" />
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Rol</label>
+                    <select name="rol_id" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="">Todos</option>
+                        <option th:each="rol : ${roles}" th:value="${rol.id}" th:selected="${#strings.toString(filtroRol) == #strings.toString(rol.id)}" th:text="${#strings.toUpperCase(rol.nombre)}"></option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Estado</label>
+                    <select name="activo" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        <option value="">Todos</option>
+                        <option value="1" th:selected="${filtroActivo == '1'}">Activo</option>
+                        <option value="0" th:selected="${filtroActivo == '0'}">Inactivo</option>
+                    </select>
+                </div>
+                <button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 focus:outline-none focus-visible:outline-[none] focus:ring-2 focus:ring-sky-500">Filtrar</button>
+            </form>
+        </div>
+
+        <div th:if="${session.ok}" class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" th:text="${session.ok}"></div>
+
+        <div class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Nombre</th>
+                            <th class="px-4 py-3 font-semibold">Correo</th>
+                            <th class="px-4 py-3 font-semibold">Rol</th>
+                            <th class="px-4 py-3 font-semibold">Estado</th>
+                            <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#efeee9]">
+                        <tr th:each="usuario : ${usuarios}">
+                            <td class="px-4 py-3 font-medium text-[#2d2b24]" th:text="${usuario.name}"></td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${usuario.email}"></td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${usuario.rol != null ? #strings.toUpperCase(usuario.rol.nombre) : '-'}"></td>
+                            <td class="px-4 py-3">
+                                <span th:if="${usuario.activo}" class="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Activo</span>
+                                <span th:unless="${usuario.activo}" class="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">Inactivo</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex justify-end gap-2">
+                                    <span sec:authorize="hasAuthority('usuarios.gestionar')">
+                                        <a th:href="@{/usuarios/{id}/edit(id=${usuario.id})}" class="btn-icon-sm bg-amber-400 hover:bg-amber-500" title="Editar">
+                                            <img th:src="@{/icons/editar.ico}" alt="Editar" class="h-4 w-4 object-contain" />
+                                        </a>
+                                        <form method="POST" th:action="@{/usuarios/{id}/toggle-activo(id=${usuario.id})}" style="display:inline">
+                                            <input type="hidden" name="_method" value="PATCH" />
+                                            <input type="hidden" name="_token" th:value="${_csrf.token}" />
+                                            <button type="submit" class="btn-icon-sm bg-red-600 hover:bg-red-700" th:title="${usuario.activo ? 'Desactivar' : 'Activar'}">
+                                                <img th:src="@{/icons/eliminar-desactivar.ico}" th:alt="${usuario.activo ? 'Desactivar' : 'Activar'}" class="h-4 w-4 object-contain" />
+                                            </button>
+                                        </form>
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(usuarios)}">
+                            <td colspan="5" class="px-4 py-8 text-center text-[#777]">No hay usuarios registrados.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="border-t border-[#efe7d2] px-4 py-3">
+                <!-- Pagination: implementar con la libreria de paginacion elegida -->
+            </div>
+        </div>
+
+        <span sec:authorize="hasAuthority('roles.ver')">
+            <template x-teleport="body">
+                <div x-show="modalRoles" style="display: none;">
+                    <div x-transition.opacity class="fixed inset-0 z-[70] bg-black/60" @click="cerrarModalRoles()"></div>
+                    <div x-transition class="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6">
+                        <div class="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                            <div class="flex items-center justify-between border-b border-[#efe7d2] px-4 py-3">
+                                <h3 class="text-base font-semibold text-[#2a2419]">Gestion de roles</h3>
+                                <button type="button" @click="cerrarModalRoles()" class="rounded-lg border border-[#d1be8a] px-3 py-1.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Cerrar</button>
+                            </div>
+
+                            <div class="grid h-full min-h-0 gap-4 overflow-hidden p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+                                <div class="min-h-0 overflow-auto rounded-2xl border border-[#e5dec8] bg-[#fcf9f3] p-4">
+                                    <h4 class="text-sm font-semibold text-[#2a2419]" x-text="editandoRolId ? 'Editar rol' : 'Nuevo rol'"></h4>
+
+                                    <div class="mt-3 space-y-3">
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-[#8a6a2e]">Nombre</label>
+                                            <input type="text" x-model="rolForm.nombre" :disabled="!puedeGestionarRoles" class="w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-3 py-2 text-sm disabled:opacity-60" placeholder="Ejemplo: caja" />
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-[#8a6a2e]">Descripcion</label>
+                                            <textarea x-model="rolForm.descripcion" rows="2" :disabled="!puedeGestionarRoles" class="w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-3 py-2 text-sm disabled:opacity-60" placeholder="Descripcion corta"></textarea>
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-[#8a6a2e]">Estado</label>
+                                            <select x-model="rolForm.activo" :disabled="!puedeGestionarRoles" class="w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-3 py-2 text-sm disabled:opacity-60">
+                                                <option :value="true">Activo</option>
+                                                <option :value="false">Inactivo</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-1 block text-xs font-medium uppercase tracking-[0.18em] text-[#8a6a2e]">Permisos</p>
+                                            <div class="max-h-52 overflow-auto rounded-xl border border-[#e5dec8] bg-white p-2">
+                                                <template x-for="permiso in permisos" :key="permiso.id">
+                                                    <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[#fcf9f3]">
+                                                        <input
+                                                            type="checkbox"
+                                                            :checked="rolForm.permisos.includes(permiso.id)"
+                                                            @change="togglePermiso(permiso.id)"
+                                                            :disabled="!puedeGestionarRoles"
+                                                            class="rounded border-[#d1be8a] text-[#8a6a2e] focus:ring-[#d1be8a]"
+                                                        >
+                                                        <span class="text-[#4a4026]" x-text="permiso.nombre"></span>
+                                                    </label>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div th:if="${puedeGestionarRoles}" class="flex gap-2">
+                                            <button type="button" @click="guardarRol()" class="rounded-xl bg-[#111] px-4 py-2 text-sm font-medium text-white hover:bg-[#262626]">
+                                                <span x-text="editandoRolId ? 'Actualizar rol' : 'Guardar rol'"></span>
+                                            </button>
+                                            <button type="button" @click="limpiarFormularioRol()" class="rounded-xl border border-[#d1be8a] px-4 py-2 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="min-h-0 overflow-auto rounded-2xl border border-[#e5dec8] bg-white">
+                                    <div class="flex items-center justify-between border-b border-[#efe7d2] px-4 py-3">
+                                        <h4 class="text-sm font-semibold text-[#2a2419]">Listado de roles</h4>
+                                        <button type="button" @click="cargarRoles()" class="rounded-lg border border-[#d1be8a] px-2.5 py-1 text-xs text-[#5a4314] hover:bg-[#fff5dd]">Recargar</button>
+                                    </div>
+
+                                    <div x-show="cargandoRoles" class="p-4 text-sm text-[#777]">Cargando roles...</div>
+                                    <div class="overflow-x-auto" x-show="!cargandoRoles">
+                                        <table class="min-w-full text-sm">
+                                            <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                                                <tr>
+                                                    <th class="px-4 py-3 font-semibold">Rol</th>
+                                                    <th class="px-4 py-3 font-semibold">Permisos</th>
+                                                    <th class="px-4 py-3 font-semibold">Usuarios</th>
+                                                    <th class="px-4 py-3 font-semibold">Estado</th>
+                                                    <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-[#efeee9]">
+                                                <template x-for="rol in roles" :key="rol.id">
+                                                    <tr>
+                                                        <td class="px-4 py-3 font-medium text-[#2d2b24]" x-text="(rol.nombre || '').toUpperCase()"></td>
+                                                        <td class="px-4 py-3 text-[#4a4026]" x-text="rol.permisos_count"></td>
+                                                        <td class="px-4 py-3 text-[#4a4026]" x-text="rol.usuarios_count"></td>
+                                                        <td class="px-4 py-3">
+                                                            <span class="rounded-lg px-2.5 py-1 text-xs font-medium" :class="rol.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'" x-text="rol.activo ? 'Activo' : 'Inactivo'"></span>
+                                                        </td>
+                                                        <td class="px-4 py-3">
+                                                            <div class="flex justify-end gap-2">
+                                                                <span th:if="${puedeGestionarRoles}">
+                                                                    <button type="button" @click="editarRol(rol)" class="btn-icon-sm bg-amber-400 hover:bg-amber-500" title="Editar rol">
+                                                                        <img th:src="@{/icons/editar.ico}" alt="Editar" class="h-4 w-4 object-contain" />
+                                                                    </button>
+                                                                    <button type="button" @click="eliminarRol(rol)" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Eliminar rol">
+                                                                        <img th:src="@{/icons/eliminar-desactivar.ico}" alt="Eliminar" class="h-4 w-4 object-contain" />
+                                                                    </button>
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                                <tr x-show="!cargandoRoles && roles.length === 0">
+                                                    <td colspan="5" class="px-4 py-8 text-center text-[#777]">No hay roles registrados.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-[#efe7d2] px-4 py-2.5">
+                                <p class="text-xs" :class="errorRoles ? 'text-rose-700' : 'text-emerald-700'" x-text="mensajeRoles"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </span>
+
+        <span sec:authorize="hasAuthority('usuarios.gestionar')">
+            <template x-teleport="body">
+                <div x-show="modalNuevo" style="display: none;">
+                    <div x-transition.opacity class="fixed inset-0 z-[70] bg-black/60" @click="cerrarNuevo()"></div>
+                    <div x-transition class="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6">
+                        <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                            <div class="flex items-center justify-between border-b border-[#efe7d2] px-4 py-3">
+                                <h3 class="text-base font-semibold text-[#2a2419]">Nuevo usuario</h3>
+                                <button type="button" @click="cerrarNuevo()" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                    <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                                </button>
+                            </div>
+
+                            <form id="nuevo-form" method="POST" th:action="@{/usuarios}" class="p-4">
+                                <input type="hidden" name="_token" th:value="${_csrf.token}" />
+                                <div th:replace="~{usuarios/_form}"></div>
+
+                                <div class="mt-6 border-t border-[#efe7d2] pt-4 flex justify-end gap-2">
+                                    <button type="button" @click="cerrarNuevo()" class="rounded-xl border border-[#d1be8a] px-4 py-2.5 text-sm font-medium text-[#5a4314] hover:bg-[#fff5dd]">Cancelar</button>
+                                    <button type="submit" class="rounded-xl bg-[#111] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#262626]">Guardar usuario</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </span>
+    </div>
+
+</div>
+</body>
+</html>

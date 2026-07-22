@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head><title>Almacen - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .btn-icon:focus-visible,
+        .btn-icon:focus,
+        .btn-icon-sm:focus-visible,
+        .btn-icon-sm:focus {
+            outline: 0 none !important;
+        }
+        .btn-icon:active,
+        .btn-icon-sm:active {
+            filter: brightness(0.85);
+        }
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .btn-icon.is-active {
+            filter: brightness(0.8);
+        }
+        .btn-icon-sm {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+    </style>
+
+    <div x-data="almacenIndex()" x-init="init()" class="space-y-5">
+
+        <section class="grid gap-4 sm:grid-cols-3">
+            <article class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Stock total</p>
+                <p class="mt-2 text-3xl font-semibold text-[#1f1f1f]" th:text="${totalStock}">0</p>
+                <p class="mt-1 text-sm text-[#666]">Unidades en inventario</p>
+            </article>
+            <article class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Entradas hoy</p>
+                <p class="mt-2 text-3xl font-semibold text-green-700" th:text="${entradasHoy}">0</p>
+                <p class="mt-1 text-sm text-[#666]">Unidades ingresadas</p>
+            </article>
+            <article class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Salidas hoy</p>
+                <p class="mt-2 text-3xl font-semibold text-red-600" th:text="${salidasHoy}">0</p>
+                <p class="mt-1 text-sm text-[#666]">Unidades retiradas</p>
+            </article>
+        </section>
+
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
+            <div class="flex items-center gap-2">
+                <form class="flex min-w-0 flex-1" x-on:submit.prevent="buscarRepartidor()">
+                    <input x-model="qRepartidor" type="text" placeholder="Buscar pedido por codigo o cliente..."
+                        class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm text-gray-900 placeholder:text-[#9a8e78] focus:border-[#b9943d] focus:ring-1 focus:ring-[#b9943d]/40"
+                        x-on:keyup.enter="buscarRepartidor()">
+                </form>
+                <button type="button" x-on:click="buscarRepartidor()" title="Buscar"
+                    class="h-10 w-10 rounded-xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center shrink-0">
+                    <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none">
+                </button>
+                <button type="button" x-on:click="buscarRepartidor()" title="Filtrar"
+                    class="btn-icon bg-sky-500 hover:bg-sky-600">
+                    <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none">
+                </button>
+                <th:block th:if="${busquedaRepartidor != null and busquedaRepartidor != ''}">
+                    <a th:href="@{/almacen}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+                </th:block>
+            </div>
+        </div>
+
+        <section class="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+            <div class="border-b border-amber-100 bg-amber-50 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                        <svg class="h-4 w-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-amber-800">Pedidos pendientes del repartidor</h3>
+                    <th:block th:if="${pedidosPendientes.totalElements > 0}">
+                        <span class="inline-flex items-center justify-center rounded-full bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-800" th:text="${pedidosPendientes.totalElements}">0</span>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Codigo</th>
+                            <th class="px-4 py-3 font-semibold">Cliente</th>
+                            <th class="px-4 py-3 font-semibold">Productos</th>
+                            <th class="px-4 py-3 font-semibold">Estado</th>
+                            <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#efeee9]">
+                        <tr th:each="pedido, iterStat : ${pedidosPendientes}" th:with="cantTotal=${pedido.productos.?[cantidadRecoge != null].isEmpty() ? pedido.productos.![cantidad].reduce(0, #a + #b) : pedido.productos.?[cantidadRecoge != null].![cantidadRecoge].reduce(0, #a + #b)}">
+                            <td class="px-4 py-3 font-medium text-[#2d2b24]" th:text="${pedido.codigo}">COD</td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.nombreCliente}">Cliente</td>
+                            <td class="px-4 py-3 text-[#4a4026]">
+                                <div th:if="${pedido.productos.size() > 1}">
+                                    <div th:each="p, i : ${pedido.productos}" th:text="${i.count} + '. ' + ${p.nombre} + ' (' + (${p.cantidadRecoge} != null ? ${p.cantidadRecoge} : ${p.cantidad}) + ')'">1. Producto (1)</div>
+                                </div>
+                                <th:block th:unless="${pedido.productos.size() > 1}">
+                                    <span th:with="first=${pedido.productos[0]}" th:text="(${first} != null ? ${first.nombre} : '-') + ' (' + (${first} != null ? (${first.cantidadRecoge} != null ? ${first.cantidadRecoge} : ${first.cantidad}) : '-') + ')'">- (-)</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">Esperando recepcion</span>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button x-on:click="verDetalle([[${pedido.id}]])" title="Ver detalle"
+                                        class="btn-icon-sm bg-blue-600 hover:bg-blue-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                    <button x-on:click="abrirRecibir([[${pedido.id}]], '[[${pedido.codigo}]]', [[${cantTotal}]])" title="Confirmar recepcion en almacen"
+                                        class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${!pedidosPendientes.hasContent()}">
+                            <td colspan="5" class="px-4 py-8 text-center">
+                                <div class="flex flex-col items-center gap-2 text-[#9a8e78]">
+                                    <svg class="h-10 w-10 text-[#d4cfc0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m-8-4v10l8 4m0-10v10"/></svg>
+                                    <p class="text-sm">No hay pedidos pendientes del repartidor</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <th:block th:if="${pedidosPendientes.totalPages > 1}">
+                <div class="border-t border-[#efeee9] bg-[#faf8f2] px-4 py-3">
+                    <nav th:replace="~{fragments/pagination :: pagination(${pedidosPendientes})}"></nav>
+                </div>
+            </th:block>
+        </section>
+
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
+            <div class="flex items-center gap-2">
+                <form class="flex min-w-0 flex-1" x-on:submit.prevent="buscarEntrega()">
+                    <input x-model="qEntrega" type="text" placeholder="Buscar pedido listo para entregar (codigo o cliente)..."
+                        class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm text-gray-900 placeholder:text-[#9a8e78] focus:border-[#b9943d] focus:ring-1 focus:ring-[#b9943d]/40"
+                        x-on:keyup.enter="buscarEntrega()">
+                </form>
+                <button type="button" x-on:click="buscarEntrega()" title="Buscar"
+                    class="h-10 w-10 rounded-xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center shrink-0">
+                    <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none">
+                </button>
+                <th:block th:if="${busquedaEntrega != null and busquedaEntrega != ''}">
+                    <a th:href="@{/almacen}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+                </th:block>
+            </div>
+        </div>
+
+        <section class="overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-sm">
+            <div class="border-b border-sky-100 bg-sky-50 px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100">
+                        <svg class="h-4 w-4 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                    <h3 class="font-semibold text-sky-800">Pedidos listos para entregar al cliente</h3>
+                    <th:block th:if="${pedidosEntrega.totalElements > 0}">
+                        <span class="inline-flex items-center justify-center rounded-full bg-sky-200 px-2 py-0.5 text-xs font-bold text-sky-800" th:text="${pedidosEntrega.totalElements}">0</span>
+                    </th:block>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Codigo</th>
+                            <th class="px-4 py-3 font-semibold">Cliente</th>
+                            <th class="px-4 py-3 font-semibold">Documento</th>
+                            <th class="px-4 py-3 font-semibold">Telefono</th>
+                            <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#efeee9]">
+                        <tr th:each="pedido : ${pedidosEntrega}">
+                            <td class="px-4 py-3 font-medium text-[#2d2b24]" th:text="${pedido.codigo}">COD</td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.nombreCliente}">Cliente</td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.cliente?.documento} ?: '-'">-</td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.cliente?.telefono} ?: '-'">-</td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button x-on:click="verDetalle([[${pedido.id}]])" title="Ver detalle"
+                                        class="btn-icon-sm bg-blue-600 hover:bg-blue-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                    <button x-on:click="abrirEntregar([[${pedido.id}]], '[[${pedido.codigo}]]', '[[${pedido.nombreCliente}]]', '[[${pedido.cliente?.documento != null ? pedido.cliente.documento : ''}]]', '[[${pedido.cliente?.telefono != null ? pedido.cliente.telefono : ''}]]', '[[${pedido.estadoPago}]]', [[${pedido.montoTotal}]], [[${pedido.montoSaldo}]])" title="Entregar al cliente"
+                                        class="btn-icon-sm bg-amber-600 hover:bg-amber-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${!pedidosEntrega.hasContent()}">
+                            <td colspan="5" class="px-4 py-8 text-center">
+                                <div class="flex flex-col items-center gap-2 text-[#9a8e78]">
+                                    <svg class="h-10 w-10 text-[#d4cfc0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    <p class="text-sm">No hay pedidos listos para entregar</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <th:block th:if="${pedidosEntrega.totalPages > 1}">
+                <div class="border-t border-[#efeee9] bg-[#faf8f2] px-4 py-3">
+                    <nav th:replace="~{fragments/pagination :: pagination(${pedidosEntrega})}"></nav>
+                </div>
+            </th:block>
+        </section>
+
+        <section class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="border-b border-[#efeee9] bg-[#faf8f2] px-4 py-3 flex items-center justify-between">
+                <h3 class="font-semibold text-[#5a4a2a]">Historial de entradas y salidas</h3>
+                <a th:href="@{/almacen/movimientos}" class="text-xs font-medium text-[#b9943d] hover:underline">Ver todo</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-left text-[#6a5a39]">
+                        <tr>
+                            <th class="px-4 py-2.5">Producto</th>
+                            <th class="px-4 py-2.5">Tipo</th>
+                            <th class="px-4 py-2.5 text-right">Cantidad</th>
+                            <th class="px-4 py-2.5 text-right">Stock</th>
+                            <th class="px-4 py-2.5">Concepto</th>
+                            <th class="px-4 py-2.5">Registrado por</th>
+                            <th class="px-4 py-2.5">Fecha</th>
+                            <th class="px-4 py-2.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#efeee9]">
+                        <tr th:each="mov : ${movimientos}">
+                            <td class="px-4 py-2.5">
+                                <span class="font-medium text-[#2d2b24]" th:text="${mov.producto?.codigo}">COD</span>
+                                <span class="text-[#4a4026]" th:text="' - ' + ${mov.producto?.nombre}"> - Nombre</span>
+                            </td>
+                            <td class="px-4 py-2.5">
+                                <span th:if="${mov.tipo == 'entrada'}" class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Entrada</span>
+                                <span th:unless="${mov.tipo == 'entrada'}" class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Salida</span>
+                            </td>
+                            <td class="px-4 py-2.5 text-right font-medium" th:text="${mov.cantidad}">0</td>
+                            <td class="px-4 py-2.5 text-right text-[#4a4026]" th:text="${mov.stockResultante}">0</td>
+                            <td class="px-4 py-2.5 text-[#4a4026]" th:text="${mov.concepto} ?: '-'">-</td>
+                            <td class="px-4 py-2.5 text-[#4a4026]" th:text="${mov.usuario?.name} ?: '-'">-</td>
+                            <td class="px-4 py-2.5 text-[#4a4026] whitespace-nowrap" th:text="${#temporals.format(mov.createdAt, 'dd/MM/yyyy HH:mm')}">01/01/2024</td>
+                            <td class="px-4 py-2.5 text-right">
+                                <th:block th:if="${mov.pedidoId != null}">
+                                    <button x-on:click="verDetalle([[${mov.pedidoId}]])" title="Ver pedido"
+                                        class="btn-icon-sm bg-blue-600 hover:bg-blue-700">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
+                                </th:block>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(movimientos)}">
+                            <td colspan="8" class="px-4 py-6 text-center text-[#777]">No hay movimientos registrados.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <!-- Modal Detalle Pedido -->
+        <div x-show="modalDetalle" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="modalDetalle = false"
+            x-on:click.self="modalDetalle = false">
+            <div x-show="modalDetalle" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Detalle del Pedido</h3>
+                    <button type="button" x-on:click="modalDetalle = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+                <template x-if="detallePedido">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div><span class="font-semibold text-[#5a4a2a]">Codigo:</span> <span x-text="detallePedido.codigo" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Estado:</span> <span x-text="detallePedido.estado" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Cliente:</span> <span x-text="detallePedido.nombreCliente" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Tipo:</span> <span x-text="detallePedido.tipoProducto" class="text-[#2d2b24]"></span></div>
+                            <div class="col-span-2"><span class="font-semibold text-[#5a4a2a]">Direccion:</span> <span x-text="detallePedido.direccionEntrega || 'No especificada'" class="text-[#2d2b24]"></span></div>
+                        </div>
+                        <div>
+                            <h4 class="mb-2 font-semibold text-[#5a4a2a]">Productos</h4>
+                            <table class="min-w-full text-xs">
+                                <thead class="bg-[#faf8f2]"><tr><th class="px-3 py-2 text-left">Producto</th><th class="px-3 py-2 text-right">Cant.</th><th class="px-3 py-2 text-right">Recoge</th></tr></thead>
+                                <tbody class="divide-y divide-[#efeee9]">
+                                    <template x-for="prod in detallePedido.productos" :key="prod.id">
+                                        <tr>
+                                            <td class="px-3 py-2" x-text="prod.nombre"></td>
+                                            <td class="px-3 py-2 text-right" x-text="prod.cantidad"></td>
+                                            <td class="px-3 py-2 text-right" x-text="prod.cantidadRecoge || prod.cantidad"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Modal Recibir -->
+        <div x-show="modalRecibir" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="modalRecibir = false"
+            x-on:click.self="modalRecibir = false">
+            <div x-show="modalRecibir" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Confirmar recepcion en almacen</h3>
+                    <button type="button" x-on:click="modalRecibir = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+                <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
+                            <svg class="h-4 w-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m-8-4v10l8 4m0-10v10"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-amber-800">Pedido <span x-text="recibirCodigo"></span></p>
+                            <p class="mt-1 text-sm text-amber-700">Se registrara la entrada de <strong x-text="recibirCantidad"></strong> unidades al stock del almacen.</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="mb-4 text-sm text-[#4a4026]">Verifique que los productos fueron entregados correctamente por el repartidor.</p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" x-on:click="modalRecibir = false"
+                        class="rounded-xl bg-gray-500 px-4 py-2 text-sm font-medium text-white hover:bg-gray-600">
+                        Cancelar
+                    </button>
+                    <button type="button" x-on:click="confirmarRecibir()" :disabled="procesando"
+                        class="rounded-xl bg-[#059669] px-4 py-2 text-sm font-medium text-white hover:bg-[#047857] disabled:opacity-50">
+                        <span x-show="!procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Confirmar recepcion
+                        </span>
+                        <span x-show="procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Procesando...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Entregar -->
+        <div x-show="modalEntregar" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="modalEntregar = false"
+            x-on:click.self="modalEntregar = false">
+            <div x-show="modalEntregar" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Entregar al cliente</h3>
+                    <button type="button" x-on:click="modalEntregar = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+
+                <div class="mb-4 rounded-xl bg-sky-50 border border-sky-200 p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-sky-100">
+                            <svg class="h-4 w-4 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-sky-800">Pedido <span x-text="entregarCodigo"></span></p>
+                            <p class="mt-1 text-sm text-sky-700">Cliente: <strong x-text="entregarCliente"></strong></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4 space-y-3">
+                    <div class="rounded-xl bg-[#faf8f2] border border-[#e5dec8] p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-[#8a6a2e]">Documento del cliente</p>
+                        <p class="mt-1 text-sm font-medium text-[#2d2b24]" x-text="entregarDocumento || 'No registrado'"></p>
+                    </div>
+                    <div class="rounded-xl bg-[#faf8f2] border border-[#e5dec8] p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-[#8a6a2e]">Telefono</p>
+                        <p class="mt-1 text-sm font-medium text-[#2d2b24]" x-text="entregarTelefono || 'No registrado'"></p>
+                    </div>
+                </div>
+
+                <div class="mb-4 rounded-xl border p-3"
+                    :class="entregarEstadoPago === 'pagado_completo' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+                    <p class="text-xs font-semibold uppercase tracking-wider"
+                        :class="entregarEstadoPago === 'pagado_completo' ? 'text-emerald-700' : 'text-red-700'">Estado del pago</p>
+                    <p class="mt-1 text-sm font-semibold"
+                        :class="entregarEstadoPago === 'pagado_completo' ? 'text-emerald-800' : 'text-red-800'"
+                        x-text="entregarEstadoPago === 'pagado_completo' ? 'Pagado completo' : (entregarEstadoPago === 'adelanto_pagado' ? 'Solo adelanto pagado' : 'Pendiente de pago')"></p>
+                    <template x-if="entregarEstadoPago !== 'pagado_completo'">
+                        <div>
+                            <p class="mt-1 text-xs text-red-600">Saldo pendiente: <span class="font-semibold" x-text="'S/ ' + Number(entregarSaldo).toFixed(2)"></span></p>
+                            <p class="mt-2 text-xs text-red-700 font-medium">No se puede entregar el pedido hasta que el pago este completo.</p>
+                        </div>
+                    </template>
+                    <template x-if="entregarEstadoPago === 'pagado_completo'">
+                        <p class="mt-1 text-xs text-emerald-600">Total: <span class="font-semibold" x-text="'S/ ' + Number(entregarMontoTotal).toFixed(2)"></span></p>
+                    </template>
+                </div>
+
+                <div class="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3">
+                    <label class="flex items-start gap-2">
+                        <input type="checkbox" x-model="entregarValidado" class="mt-1 h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                        <span class="text-sm text-amber-800">Valido que el cliente se identifico correctamente con su documento y recibe el pedido.</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" x-on:click="modalEntregar = false"
+                        class="rounded-xl bg-gray-500 px-4 py-2 text-sm font-medium text-white hover:bg-gray-600">
+                        Cancelar
+                    </button>
+                    <button type="button" x-on:click="confirmarEntregar()" :disabled="procesando || !entregarValidado || entregarEstadoPago !== 'pagado_completo'"
+                        class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                        <span x-show="!procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            Confirmar entrega
+                        </span>
+                        <span x-show="procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Procesando...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Exito -->
+        <div x-show="mostrarExito" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="mostrarExito = false"
+            x-on:click.self="mostrarExito = false">
+            <div x-show="mostrarExito" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                        <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-[#2d2b24]">Operacion exitosa</p>
+                        <p class="mt-1 text-sm text-[#4a4026]" x-text="mensajeExito"></p>
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button x-on:click="mostrarExito = false" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Error -->
+        <div x-show="mostrarError" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="mostrarError = false"
+            x-on:click.self="mostrarError = false">
+            <div x-show="mostrarError" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-[#2d2b24]">Error</p>
+                        <p class="mt-1 text-sm text-[#4a4026]" x-text="mensajeError"></p>
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button x-on:click="mostrarError = false" class="btn-icon-sm bg-red-600 hover:bg-red-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        function almacenIndex() {
+            return {
+                qRepartidor: '[[${busquedaRepartidor}]]' || '',
+                qEntrega: '[[${busquedaEntrega}]]' || '',
+                modalDetalle: false,
+                modalRecibir: false,
+                modalEntregar: false,
+                detallePedido: null,
+                recibirId: null,
+                recibirCodigo: '',
+                recibirCantidad: 0,
+                entregarId: null,
+                entregarCodigo: '',
+                entregarCliente: '',
+                entregarDocumento: '',
+                entregarTelefono: '',
+                entregarValidado: false,
+                entregarEstadoPago: '',
+                entregarMontoTotal: 0,
+                entregarSaldo: 0,
+                procesando: false,
+                mostrarExito: false,
+                mostrarError: false,
+                mensajeExito: '',
+                mensajeError: '',
+
+                init() {},
+
+                buscarRepartidor() {
+                    const params = new URLSearchParams();
+                    if (this.qRepartidor) params.set('q', this.qRepartidor);
+                    window.location.href = '[[@{/almacen}]]?' + params.toString();
+                },
+
+                async verDetalle(pedidoId) {
+                    try {
+                        const resp = await fetch('/pedidos/' + pedidoId, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await resp.json();
+                        this.detallePedido = data;
+                        this.modalDetalle = true;
+                    } catch (e) {
+                        this.error('No se pudo cargar el detalle del pedido.');
+                    }
+                },
+
+                abrirRecibir(id, codigo, cantidad) {
+                    this.recibirId = id;
+                    this.recibirCodigo = codigo;
+                    this.recibirCantidad = cantidad;
+                    this.modalRecibir = true;
+                },
+
+                async confirmarRecibir() {
+                    this.procesando = true;
+                    try {
+                        const resp = await fetch('/almacen/pedidos/' + this.recibirId + '/recibir', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const data = await resp.json();
+                        this.modalRecibir = false;
+                        if (data.ok) {
+                            this.exito(data.message || 'Pedido recibido en almacen correctamente.');
+                            setTimeout(() => window.location.reload(), 1200);
+                        } else {
+                            this.error(data.message || 'No se pudo recibir el pedido.');
+                        }
+                    } catch (e) {
+                        this.modalRecibir = false;
+                        this.error('Error de conexion al recibir el pedido.');
+                    }
+                    this.procesando = false;
+                },
+
+                buscarEntrega() {
+                    const params = new URLSearchParams();
+                    if (this.qEntrega) params.set('qe', this.qEntrega);
+                    window.location.href = '[[@{/almacen}]]?' + params.toString();
+                },
+
+                abrirEntregar(id, codigo, cliente, documento, telefono, estadoPago, montoTotal, saldo) {
+                    this.entregarId = id;
+                    this.entregarCodigo = codigo;
+                    this.entregarCliente = cliente;
+                    this.entregarDocumento = documento;
+                    this.entregarTelefono = telefono;
+                    this.entregarEstadoPago = estadoPago;
+                    this.entregarMontoTotal = montoTotal;
+                    this.entregarSaldo = saldo;
+                    this.entregarValidado = false;
+                    this.modalEntregar = true;
+                },
+
+                async confirmarEntregar() {
+                    this.procesando = true;
+                    try {
+                        const resp = await fetch('/almacen/pedidos/' + this.entregarId + '/entregar-cliente', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const data = await resp.json();
+                        this.modalEntregar = false;
+                        if (data.ok) {
+                            this.exito(data.message || 'Pedido entregado al cliente correctamente.');
+                            setTimeout(() => window.location.reload(), 1200);
+                        } else {
+                            this.error(data.message || 'No se pudo entregar el pedido.');
+                        }
+                    } catch (e) {
+                        this.modalEntregar = false;
+                        this.error('Error de conexion al entregar el pedido.');
+                    }
+                    this.procesando = false;
+                },
+
+                exito(msg) {
+                    this.mensajeExito = msg;
+                    this.mostrarExito = true;
+                    this.mostrarError = false;
+                },
+
+                error(msg) {
+                    this.mensajeError = msg;
+                    this.mostrarError = true;
+                    this.mostrarExito = false;
+                }
+            }
+        }
+    </script>
+
+</div>
+</body>
+</html>

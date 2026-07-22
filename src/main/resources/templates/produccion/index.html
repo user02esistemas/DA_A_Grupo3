@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head><title>Produccion - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .btn-icon:focus-visible,
+        .btn-icon:focus,
+        .btn-icon-sm:focus-visible,
+        .btn-icon-sm:focus {
+            outline: 0 none !important;
+        }
+        .btn-icon:active,
+        .btn-icon-sm:active {
+            filter: brightness(0.85);
+        }
+        .btn-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+        .btn-icon-sm {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+    </style>
+
+    <div x-data="{
+        filtrosAbiertos: false,
+        iniciarData: null,
+        notificarData: null,
+        showSuccess: false,
+        successMessage: '',
+        showError: false,
+        errorMessage: ''
+    }" class="space-y-3">
+
+        <!-- Barra de busqueda + filtros -->
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
+            <div class="flex items-center gap-2">
+                <form id="produccion-search-form" method="GET" th:action="@{/produccion}" class="flex min-w-0 flex-1">
+                    <th:block th:if="${filtroEstado != null and filtroEstado != ''}">
+                        <input type="hidden" name="estado" th:value="${filtroEstado}" />
+                    </th:block>
+                    <input type="text" name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 text-sm text-gray-900 h-10" placeholder="Buscar por codigo, cliente o producto" />
+                </form>
+                <button type="submit" form="produccion-search-form" class="h-10 w-10 rounded-xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center shrink-0" title="Buscar">
+                    <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none" />
+                </button>
+                <button type="button" @click="filtrosAbiertos = !filtrosAbiertos"
+                    class="h-10 w-10 rounded-xl bg-sky-500 hover:bg-sky-600 flex items-center justify-center shrink-0"
+                    title="Filtrar"
+                    :style="(filtrosAbiertos || (filtroEstado !== '' && filtroEstado !== null && filtroEstado !== undefined)) ? 'box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0ea5e9' : ''">
+                    <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none" />
+                </button>
+                <th:block th:if="${(busqueda != null and busqueda != '') or (filtroEstado != null and filtroEstado != '')}">
+                    <a th:href="@{/produccion}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+                </th:block>
+            </div>
+            <form x-show="filtrosAbiertos" x-transition method="GET" th:action="@{/produccion}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
+                <th:block th:if="${busqueda != null and busqueda != ''}">
+                    <input type="hidden" name="q" th:value="${busqueda}" />
+                </th:block>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-500">Estado</label>
+                    <select name="estado" class="rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-3 py-2 text-sm text-gray-900">
+                        <option value="">Todos</option>
+                        <option value="en_produccion" th:selected="${filtroEstado == 'en_produccion'}">En produccion</option>
+                        <option value="produciendo" th:selected="${filtroEstado == 'produciendo'}">Produciendo</option>
+                    </select>
+                </div>
+                <button type="submit" class="rounded-xl bg-[#111] px-4 py-2 text-sm font-medium text-white hover:bg-[#262626]">Aplicar</button>
+            </form>
+        </div>
+
+        <!-- Tabla -->
+        <div class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Codigo</th>
+                            <th class="px-4 py-3 font-semibold">Cliente</th>
+                            <th class="px-4 py-3 font-semibold">Productos</th>
+                            <th class="px-4 py-3 font-semibold">Estado</th>
+                            <th class="px-4 py-3 font-semibold">Estado diseno</th>
+                            <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#efeee9]">
+                        <tr th:each="pedido, iterStat : ${pedidos}" th:with="productosText=${pedido.productos != null and !pedido.productos.isEmpty()} ? ${#strings.listJoin(#lists.sort(#lists.toList(#lists.select(pedido.productos, p -> p.nombre)), #strings.toString(#lists.indexOf(#lists.toList(#lists.select(pedido.productos, p -> p.nombre)), p -> p.nombre))), ', ')} : (${pedido.nombreProducto != null and pedido.nombreProducto != ''} ? ${pedido.nombreProducto} : (${pedido.tipoProducto != null and pedido.tipoProducto != ''} ? ${pedido.tipoProducto} : '-'))">
+                            <td class="px-4 py-3 font-medium text-[#2d2b24]" th:text="${pedido.codigo}">-</td>
+                            <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.nombreCliente}">-</td>
+                            <td class="px-4 py-3 text-[#4a4026]">
+                                <th:block th:if="${pedido.productos != null and pedido.productos.size() > 1}">
+                                    <div>
+                                        <div th:each="p, i : ${pedido.productos}"><span th:text="${i.index + 1}"></span>. <span th:text="${p.nombre}"></span></div>
+                                    </div>
+                                </th:block>
+                                <th:block th:unless="${pedido.productos != null and pedido.productos.size() > 1}">
+                                    <span th:text="${productosText}">-</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3">
+                                <th:block th:if="${pedido.estado == 'produciendo'}">
+                                    <span class="rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">Produciendo</span>
+                                </th:block>
+                                <th:block th:unless="${pedido.estado == 'produciendo'}">
+                                    <span class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">En produccion</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3">
+                                <th:block th:if="${pedido.estadoPersonalizacion == 'aprobado'}">
+                                    <span class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Aprobado</span>
+                                </th:block>
+                                <th:block th:elif="${pedido.estadoPersonalizacion == 'en_revision'}">
+                                    <span class="rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">En revision</span>
+                                </th:block>
+                                <th:block th:elif="${pedido.estadoPersonalizacion == 'en_diseno'}">
+                                    <span class="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">En diseno</span>
+                                </th:block>
+                                <th:block th:unless="${pedido.estadoPersonalizacion == 'aprobado' or pedido.estadoPersonalizacion == 'en_revision' or pedido.estadoPersonalizacion == 'en_diseno'}">
+                                    <span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-medium text-[#6a5122]" th:text="${#strings.replace(pedido.estadoPersonalizacion != null ? pedido.estadoPersonalizacion : 'sin_iniciar', '_', ' ')}">sin iniciar</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" @click="$dispatch('open-detalle-' + ${pedido.id})" class="btn-icon-sm" style="background-color:#0891B2" title="Ver detalle">
+                                        <img th:src="@{/icons/ver-detalle.ico}" alt="Ver detalle" class="h-4 w-4 object-contain pointer-events-none">
+                                    </button>
+                                    <th:block th:if="${pedido.estado == 'en_produccion'}">
+                                        <button type="button"
+                                            @click="iniciarData = { id: ${pedido.id}, codigo: '${pedido.codigo}', url: '/produccion/' + ${pedido.id} + '/iniciar' }"
+                                            class="btn-icon-sm bg-sky-600 hover:bg-sky-700" title="Iniciar produccion">
+                                            <svg class="h-4 w-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        </button>
+                                    </th:block>
+                                    <th:block th:if="${pedido.estado == 'produciendo'}">
+                                        <button type="button"
+                                            @click="notificarData = { id: ${pedido.id}, codigo: '${pedido.codigo}', url: '/produccion/' + ${pedido.id} + '/notificar' }"
+                                            class="btn-icon-sm bg-amber-600 hover:bg-amber-700" title="Notificar repartidor">
+                                            <svg class="h-4 w-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                        </button>
+                                    </th:block>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:unless="${!pedidos.isEmpty()}">
+                            <td colspan="6" class="px-4 py-8 text-center text-[#777]">No hay pedidos en produccion.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="px-1">
+            <nav th:if="${pedidos.totalPages > 1}" th:replace="~{fragments/pagination :: pagination(${pedidos})}"></nav>
+        </div>
+
+        <!-- Modal confirmar iniciar produccion -->
+        <template x-teleport="body">
+            <div x-show="iniciarData" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="iniciarData = null"></div>
+                <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                            <h3 class="text-base font-semibold text-[#2a2419]">Iniciar produccion</h3>
+                            <button type="button" @click="iniciarData = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                            </button>
+                        </div>
+                        <div class="p-5 text-center">
+                            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-sky-100">
+                                <svg class="h-7 w-7 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <p class="text-sm text-gray-600">Deseas iniciar la produccion del pedido <strong x-text="iniciarData?.codigo"></strong>?</p>
+                            <div class="mt-5 flex justify-center gap-3">
+                                <button type="button" @click="iniciarData = null" class="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200">Cancelar</button>
+                                <button type="button" @click="
+                                    fetch(iniciarData.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=_csrf]').content }, body: JSON.stringify({}) })
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        iniciarData = null;
+                                        if (d.ok) { successMessage = d.message; showSuccess = true; setTimeout(() => location.reload(), 1500); }
+                                        else { errorMessage = d.message; showError = true; }
+                                    })
+                                    .catch(() => { iniciarData = null; errorMessage = 'Error de conexion.'; showError = true; })
+                                "
+                                class="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Modal confirmar notificar repartidor -->
+        <template x-teleport="body">
+            <div x-show="notificarData" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="notificarData = null"></div>
+                <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                            <h3 class="text-base font-semibold text-[#2a2419]">Notificar repartidor</h3>
+                            <button type="button" @click="notificarData = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                            </button>
+                        </div>
+                        <div class="p-5 text-center">
+                            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100">
+                                <svg class="h-7 w-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            </div>
+                            <p class="text-sm text-gray-600">Marcar el pedido <strong x-text="notificarData?.codigo"></strong> como listo y notificar al repartidor para que lo recoja?</p>
+                            <div class="mt-5 flex justify-center gap-3">
+                                <button type="button" @click="notificarData = null" class="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-200">Cancelar</button>
+                                <button type="button" @click="
+                                    fetch(notificarData.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=_csrf]').content }, body: JSON.stringify({}) })
+                                    .then(r => r.json())
+                                    .then(d => {
+                                        notificarData = null;
+                                        if (d.ok) { successMessage = d.message; showSuccess = true; setTimeout(() => location.reload(), 1500); }
+                                        else { errorMessage = d.message; showError = true; }
+                                    })
+                                    .catch(() => { notificarData = null; errorMessage = 'Error de conexion.'; showError = true; })
+                                "
+                                class="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700">Confirmar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Modal exito -->
+        <template x-teleport="body">
+            <div x-show="showSuccess" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="showSuccess = false"></div>
+                <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white px-16 pt-12 pb-12 text-center shadow-xl">
+                        <div class="mx-auto mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                            <img th:src="@{/icons/Valido-Verde.png}" alt="Valido" class="h-8 w-8 object-contain pointer-events-none" />
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900" x-text="successMessage"></h3>
+                        <button type="button" @click="showSuccess = false" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#111] py-3 text-sm font-semibold text-white hover:bg-[#262626]" style="padding-left:48px;padding-right:48px">Entendido</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Modal error -->
+        <template x-teleport="body">
+            <div x-show="showError" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="showError = false"></div>
+                <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white px-16 pt-12 pb-12 text-center shadow-xl">
+                        <div class="mx-auto mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                            <img th:src="@{/icons/Alerta-Rojo.png}" alt="Alerta" class="h-8 w-8 object-contain pointer-events-none" />
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900" x-text="errorMessage"></h3>
+                        <button type="button" @click="showError = false" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#111] py-3 text-sm font-semibold text-white hover:bg-[#262626]" style="padding-left:48px;padding-right:48px">Entendido</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Detalle + Viewer por cada pedido -->
+    <th:block th:each="pedido : ${pedidos}">
+        <div x-data="{
+            open: false,
+            viewerOpen: false,
+            viewerIndex: 0,
+            viewerFiles: [[${pedidosFiles}]].filter(f => f.pedidoId === /*[[${pedido.id}]]*/ 0),
+            get viewerTotal() { return this.viewerFiles.length },
+            get currentFile() { return this.viewerFiles[this.viewerIndex] },
+            get esImagen() {
+                if (!this.currentFile) return false;
+                return ['image/png','image/jpeg','image/jpg','image/gif','image/svg+xml','image/webp'].includes(this.currentFile.mime);
+            },
+            prevFile() { if (this.viewerIndex > 0) this.viewerIndex-- },
+            nextFile() { if (this.viewerIndex < this.viewerTotal - 1) this.viewerIndex++ }
+        }"
+             x-show="open"
+             x-on:open-detalle-/*[[${pedido.id}]]*/.window="open = true"
+             x-on:keydown.escape.window="open = false"
+             x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div @click.outside="open = false" class="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b border-[#e5dec8] px-6 py-4">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Produccion — <span th:text="${pedido.codigo}">-</span></h3>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="viewerOpen = true; viewerIndex = 0" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700" title="Ver modelos">
+                            <img th:src="@{/icons/VerModelo-Blanco.png}" alt="Ver modelos" class="h-4 w-4 object-contain pointer-events-none">
+                        </button>
+                        <button type="button" @click="open = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto px-6 py-4">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Cliente</p>
+                            <p class="mt-1 text-[#2d2b24]" th:text="${pedido.nombreCliente}">-</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Tipo producto</p>
+                            <p class="mt-1 text-[#2d2b24]" th:text="${pedido.tipoProducto}">-</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Cantidad</p>
+                            <p class="mt-1 text-[#2d2b24]" th:text="${pedido.productos != null ? #lists.size(pedido.productos) : pedido.cantidad}">-</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Estado diseno</p>
+                            <th:block th:if="${pedido.estadoPersonalizacion == 'aprobado'}">
+                                <span class="mt-1 inline-block rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">Aprobado</span>
+                            </th:block>
+                            <th:block th:elif="${pedido.estadoPersonalizacion == 'en_revision'}">
+                                <span class="mt-1 inline-block rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">En revision</span>
+                            </th:block>
+                            <th:block th:unless="${pedido.estadoPersonalizacion == 'aprobado' or pedido.estadoPersonalizacion == 'en_revision'}">
+                                <span class="mt-1 inline-block rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-medium text-[#6a5122]" th:text="${#strings.replace(pedido.estadoPersonalizacion != null ? pedido.estadoPersonalizacion : 'sin_iniciar', '_', ' ')}">sin iniciar</span>
+                            </th:block>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Detalle del trabajo</p>
+                        <p class="mt-1 text-[#2d2b24]" th:text="${pedido.detalleTrabajo != null ? pedido.detalleTrabajo : '-'}">-</p>
+                    </div>
+
+                    <th:block th:if="${pedido.observacionesPersonalizacion != null and pedido.observacionesPersonalizacion != ''}">
+                        <div class="mt-4">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-[#6a5122]">Observaciones</p>
+                            <p class="mt-1 text-[#2d2b24]" th:text="${pedido.observacionesPersonalizacion}">-</p>
+                        </div>
+                    </th:block>
+
+                    <th:block th:if="${pedido.productos != null and !pedido.productos.isEmpty()}">
+                        <div class="mt-4 overflow-x-auto rounded-xl border border-[#e5dec8]">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="bg-[#faf8f2] text-left text-xs font-semibold uppercase tracking-wider text-[#6a5122]">
+                                        <th class="px-3 py-2">#</th>
+                                        <th class="px-3 py-2">Nombre</th>
+                                        <th class="px-3 py-2">Descripcion</th>
+                                        <th class="px-3 py-2">Cant.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="pp, idx : ${pedido.productos}" class="border-t border-[#efeee9]">
+                                        <td class="px-3 py-2 text-center text-[#999]" th:text="${idx.index + 1}">1</td>
+                                        <td class="px-3 py-2 font-medium text-[#2d2b24]" th:text="${pp.nombre}">-</td>
+                                        <td class="px-3 py-2 text-[#4a4026]" th:text="${pp.descripcion != null ? pp.descripcion : '-'}">-</td>
+                                        <td class="px-3 py-2 text-[#4a4026]" th:text="${pp.cantidad}">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </th:block>
+
+                    <div class="mt-4 rounded-xl border border-[#e5dec8] p-4">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-700">Modelo del cliente / referencia</p>
+                        <th:block th:with="refs=${pedido.productos} != null ? ${#lists.toList(pedido.productos).stream().flatMap(p -> p.archivos.stream()).toList()} : ${T(java.util.Collections).emptyList()}">
+                            <th:block th:if="${!refs.isEmpty()}">
+                                <div class="flex flex-wrap gap-2">
+                                    <a th:each="a : ${refs}" th:href="@{'/storage/' + ${a.archivoPath}}" target="_blank"
+                                       class="inline-flex items-center gap-1 rounded-lg border border-[#e5dec8] px-3 py-1.5 text-sm text-[#6a5122] hover:bg-[#faf8f2]">
+                                        <img th:src="@{/icons/Imagen-Test.png}" alt="" class="h-4 w-4 object-contain">
+                                        <span th:text="${a.nombreOriginal}">-</span>
+                                        <span class="text-[#bbb]">(<span th:text="${T(Math).round(a.tamanoBytes / 1024)}">0</span> KB)</span>
+                                    </a>
+                                </div>
+                            </th:block>
+                            <th:block th:unless="${!refs.isEmpty()}">
+                                <p class="text-[#bbb]">Sin archivos de referencia</p>
+                            </th:block>
+                        </th:block>
+                    </div>
+
+                    <div class="mt-4 rounded-xl border border-[#e5dec8] p-4">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700">Diseno del disenador</p>
+                        <th:block th:if="${pedido.archivosDiseno != null and !pedido.archivosDiseno.isEmpty()}">
+                            <div class="flex flex-wrap gap-2">
+                                <a th:each="a : ${pedido.archivosDiseno}" th:href="@{'/storage/' + ${a.archivoPath}}" target="_blank"
+                                   class="inline-flex items-center gap-1 rounded-lg border border-[#e5dec8] px-3 py-1.5 text-sm text-[#6a5122] hover:bg-[#faf8f2]">
+                                    <img th:src="@{/icons/Imagen-Test.png}" alt="" class="h-4 w-4 object-contain">
+                                    <span th:text="${a.nombreOriginal}">-</span>
+                                    <span class="text-[#bbb]">(<span th:text="${T(Math).round(a.tamanoBytes / 1024)}">0</span> KB)</span>
+                                </a>
+                            </div>
+                        </th:block>
+                        <th:block th:unless="${pedido.archivosDiseno != null and !pedido.archivosDiseno.isEmpty()}">
+                            <p class="text-[#bbb]">Sin diseno del disenador</p>
+                        </th:block>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-3 border-t border-[#e5dec8] pt-4">
+                        <th:block th:if="${pedido.estado == 'en_produccion'}">
+                            <button type="button"
+                                @click="open = false; iniciarData = { id: /*[[${pedido.id}]]*/ 0, codigo: '/*[[${pedido.codigo}]]*/', url: '/produccion/' + /*[[${pedido.id}]]*/ 0 + '/iniciar' }"
+                                class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Iniciar produccion
+                            </button>
+                        </th:block>
+                        <th:block th:if="${pedido.estado == 'produciendo'}">
+                            <button type="button"
+                                @click="open = false; notificarData = { id: /*[[${pedido.id}]]*/ 0, codigo: '/*[[${pedido.codigo}]]*/', url: '/produccion/' + /*[[${pedido.id}]]*/ 0 + '/notificar' }"
+                                class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                Notificar repartidor
+                            </button>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="viewerOpen"
+                 x-on:keydown.escape.window="viewerOpen = false"
+                 x-on:keydown.left.window="viewerOpen && prevFile()"
+                 x-on:keydown.right.window="viewerOpen && nextFile()"
+                 x-cloak
+                 class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                <div @click.outside="viewerOpen = false" class="relative mx-4 w-full max-w-3xl rounded-2xl bg-[#1a1a1a] p-4 shadow-xl">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-white/80">Modelos — <span th:text="${pedido.codigo}">-</span></h3>
+                        <button type="button" @click="viewerOpen = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                        </button>
+                    </div>
+                    <template x-if="viewerTotal === 0">
+                        <div class="flex h-64 items-center justify-center text-white/50">No hay archivos.</div>
+                    </template>
+                    <template x-if="viewerTotal > 0">
+                        <div>
+                            <div class="relative flex items-center">
+                                <button x-show="viewerIndex > 0" @click="prevFile()"
+                                        class="absolute left-0 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                </button>
+                                <div class="mx-auto flex h-80 w-full items-center justify-center overflow-hidden rounded-xl bg-black/40">
+                                    <template x-if="esImagen">
+                                        <img :src="currentFile.url" :alt="currentFile.nombre" class="max-h-full max-w-full object-contain">
+                                    </template>
+                                    <template x-if="!esImagen">
+                                        <div class="flex flex-col items-center gap-3 text-center text-white/70">
+                                            <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                            <p class="text-sm" x-text="currentFile.nombre"></p>
+                                            <a :href="currentFile.url" target="_blank" class="inline-flex items-center gap-1 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/30">Descargar archivo</a>
+                                        </div>
+                                    </template>
+                                </div>
+                                <button x-show="viewerIndex < viewerTotal - 1" @click="nextFile()"
+                                        class="absolute right-0 z-10 flex h-10 w-10 translate-x-1/2 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/40">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </button>
+                            </div>
+                            <div class="mt-3 flex items-center justify-center gap-3 text-xs text-white/60">
+                                <span x-text="`${viewerIndex + 1} de ${viewerTotal}`"></span>
+                                <span class="text-white/30">|</span>
+                                <span x-text="currentFile?.tipo === 'referencia' ? 'Modelo cliente' : 'Diseno disenador'"></span>
+                                <span class="text-white/30">|</span>
+                                <span x-text="currentFile?.nombre || ''" class="max-w-[200px] truncate"></span>
+                            </div>
+                            <div class="mt-2 flex justify-center gap-1">
+                                <template x-for="(_, i) in viewerFiles" :key="i">
+                                    <button @click="viewerIndex = i"
+                                            :class="i === viewerIndex ? 'bg-amber-500' : 'bg-white/20 hover:bg-white/40'"
+                                            class="h-1.5 w-6 rounded-full transition-colors"></button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </th:block>
+</div>
+</body>
+</html>

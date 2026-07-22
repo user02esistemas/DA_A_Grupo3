@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<body>
+<div th:fragment="form">
+    <div class="grid gap-4 md:grid-cols-2">
+        <div>
+            <label for="nombre_completo" class="mb-2 block text-sm font-medium text-[#7a6030]">Nombre completo</label>
+            <input id="nombre_completo" name="nombre_completo" type="text" th:value="${oldNombreCompleto != null ? oldNombreCompleto : (cliente != null ? cliente.nombreCompleto : '')}" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Nombre del cliente" />
+        </div>
+
+        <div>
+            <label for="documento" class="mb-2 block text-sm font-medium text-[#7a6030]">Documento</label>
+            <input id="documento" name="documento" type="text" th:value="${oldDocumento != null ? oldDocumento : (cliente != null ? cliente.documento : '')}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="DNI / RUC" />
+        </div>
+
+        <div>
+            <label for="telefono" class="mb-2 block text-sm font-medium text-[#7a6030]">Telefono</label>
+            <input id="telefono" name="telefono" type="text" th:value="${oldTelefono != null ? oldTelefono : (cliente != null ? cliente.telefono : '')}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="999999999" />
+        </div>
+
+        <div>
+            <label for="correo" class="mb-2 block text-sm font-medium text-[#7a6030]">Correo</label>
+            <input id="correo" name="correo" type="email" th:value="${oldCorreo != null ? oldCorreo : (cliente != null ? cliente.correo : '')}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="cliente@correo.com" />
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <label for="direccion" class="mb-2 block text-sm font-medium text-[#7a6030]">Direccion</label>
+        <textarea id="direccion" name="direccion" rows="2" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Direccion del cliente" th:text="${oldDireccion != null ? oldDireccion : (cliente != null ? cliente.direccion : '')}"></textarea>
+    </div>
+
+    <div class="mt-4">
+        <label for="observaciones" class="mb-2 block text-sm font-medium text-[#7a6030]">Observaciones</label>
+        <textarea id="observaciones" name="observaciones" rows="3" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Notas internas" th:text="${oldObservaciones != null ? oldObservaciones : (cliente != null ? cliente.observaciones : '')}"></textarea>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title th:text="'Comprobante ' + ${venta?.comprobante?.codigo}">Comprobante</title>
+    <style>
+        body { font-family: DejaVu Sans, Arial, sans-serif; color: #111; font-size: 12px; margin: 0; }
+        .sheet { padding: 24px 26px; }
+        .head { border: 1px solid #d8c89a; border-radius: 10px; padding: 14px 16px; }
+        .head table { width: 100%; border-collapse: collapse; }
+        .empresa { font-size: 20px; font-weight: 700; color: #2a2419; margin-bottom: 6px; }
+        .muted { color: #575757; font-size: 11px; line-height: 1.35; }
+        .docbox { text-align: right; }
+        .docbox .tipo { font-weight: 700; font-size: 13px; color: #6a5122; }
+        .docbox .codigo { font-weight: 700; font-size: 17px; margin: 4px 0; }
+        .panel { border: 1px solid #e4d7b6; border-radius: 10px; margin-top: 12px; overflow: hidden; }
+        .panel-title { background: #f8f2e1; color: #6a5122; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 9px 12px; }
+        .panel-body { padding: 10px 12px; }
+        .meta { width: 100%; border-collapse: collapse; }
+        .meta td { padding: 5px 0; vertical-align: top; }
+        .k { color: #7c6430; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+        .v { color: #111; font-size: 12px; }
+        table.detalle { width: 100%; border-collapse: collapse; }
+        table.detalle th { background: #fcf8ee; color: #5a4a2a; font-size: 11px; font-weight: 700; border-bottom: 1px solid #eadfbe; padding: 8px 10px; text-align: left; }
+        table.detalle td { border-bottom: 1px solid #efe6cf; padding: 8px 10px; }
+        table.detalle tr:last-child td { border-bottom: none; }
+        .totales { width: 320px; margin-left: auto; }
+        .row { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        .row td { padding: 4px 0; }
+        .row .label { color: #4f4f4f; }
+        .row.total { border-top: 1px solid #d8c89a; margin-top: 6px; padding-top: 6px; }
+        .row.total td { font-weight: 700; font-size: 13px; color: #2a2419; }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="head">
+            <table>
+                <tr>
+                    <td style="width: 62%;">
+                        <div class="empresa">ARTE Y METAL</div>
+                        <div class="muted">Alfredo Lapoint 1074 - Chiclayo</div>
+                        <div class="muted">RUC 20608082329</div>
+                    </td>
+                    <td class="docbox">
+                        <div class="tipo" th:text="${#strings.toUpperCase(venta.comprobante.tipoComprobante)}"></div>
+                        <div class="codigo" th:text="${venta.comprobante.codigo}"></div>
+                        <div class="muted">Fecha <span th:text="${#temporals.format(venta.fechaVenta, 'dd/MM/yyyy')}"></span></div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">Datos del cliente</div>
+            <div class="panel-body">
+                <table class="meta">
+                    <tr>
+                        <td style="width: 50%;">
+                            <div class="k">Cliente</div>
+                            <div class="v" th:text="${venta.comprobante.nombreCliente}"></div>
+                        </td>
+                        <td style="width: 50%;">
+                            <div class="k">Documento</div>
+                            <div class="v">
+                                <span th:if="${venta.comprobante.documentoCliente != null}" th:text="${venta.comprobante.documentoCliente}"></span>
+                                <span th:unless="${venta.comprobante.documentoCliente != null}">-</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="k">Direccion</div>
+                            <div class="v">
+                                <span th:if="${venta.comprobante.direccionCliente != null}" th:text="${venta.comprobante.direccionCliente}"></span>
+                                <span th:unless="${venta.comprobante.direccionCliente != null}">-</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="k">Operacion</div>
+                            <div class="v">
+                                <span th:text="${venta.tipoVenta == 'pedido'} ? 'Cierre de pedido' : 'Venta de stock'"></span> - <span th:text="${venta.codigo}"></span>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">Detalle de productos</div>
+            <div class="panel-body" style="padding: 0;">
+                <table class="detalle">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th style="width: 80px;">Cantidad</th>
+                            <th style="width: 110px;">P. Unit.</th>
+                            <th style="width: 120px;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="detalle : ${venta.detalles}">
+                            <td th:text="${detalle.productoNombre}"></td>
+                            <td th:text="${detalle.cantidad}"></td>
+                            <td>S/ <span th:text="${#numbers.formatDecimal(detalle.precioUnitario, 1, 2)}"></span></td>
+                            <td>S/ <span th:text="${#numbers.formatDecimal(detalle.subtotal, 1, 2)}"></span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">Resumen de montos</div>
+            <div class="panel-body">
+                <table class="totales">
+                    <tr class="row">
+                        <td class="label">Subtotal items</td>
+                        <td style="text-align:right;">S/ <span th:text="${#numbers.formatDecimal(subtotalItems, 1, 2)}"></span></td>
+                    </tr>
+                    <tr class="row">
+                        <td class="label">Cobrado</td>
+                        <td style="text-align:right;">S/ <span th:text="${#numbers.formatDecimal(venta.montoCobrado, 1, 2)}"></span></td>
+                    </tr>
+                    <tr class="row total">
+                        <td>Total comprobante</td>
+                        <td style="text-align:right;">S/ <span th:text="${#numbers.formatDecimal(totalComprobante, 1, 2)}"></span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

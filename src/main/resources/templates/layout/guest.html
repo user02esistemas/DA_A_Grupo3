@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>ARTE Y METAL</title>
+        <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=cinzel:400,600,700|manrope:400,500,600&display=swap" rel="stylesheet" />
+        <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    </head>
+    <body class="bg-[#050505] text-[#1e1a11] antialiased" style="font-family:'Manrope',sans-serif;">
+        <div class="relative min-h-dvh overflow-hidden">
+            <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(212,175,85,0.16),transparent_42%),radial-gradient(circle_at_88%_76%,rgba(158,118,36,0.16),transparent_34%)]"></div>
+            <div class="relative mx-auto flex min-h-dvh w-full max-w-7xl items-center justify-center px-4 py-8">
+                <main class="w-full max-w-xl rounded-3xl border border-[#d9be75]/80 bg-white p-6 shadow-[0_0_45px_rgba(212,175,85,0.28)] sm:p-8 lg:p-10">
+                    <div layout:fragment="content">Contenido</div>
+                </main>
+            </div>
+        </div>
+    </body>
+</html>

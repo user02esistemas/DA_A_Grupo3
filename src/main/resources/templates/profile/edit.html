@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
+<head><title>Configuracion - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+    <div class="space-y-5">
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-[#2a2419]">Ajustes de cuenta</h2>
+            <p class="mt-1 text-sm text-[#6e6758]">Administra datos personales, seguridad y cierre de cuenta.</p>
+        </div>
+
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+            <div th:replace="~{profile/partials/update-profile-information-form}"></div>
+        </div>
+
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-5 shadow-sm">
+            <div th:replace="~{profile/partials/update-password-form}"></div>
+        </div>
+
+        <div class="rounded-2xl border border-rose-200 bg-white p-5 shadow-sm">
+            <div th:replace="~{profile/partials/delete-user-form}"></div>
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

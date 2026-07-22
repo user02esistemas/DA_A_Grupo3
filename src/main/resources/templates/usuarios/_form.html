@@ -1,0 +1,37 @@
+<div class="grid gap-4 md:grid-cols-2">
+    <div>
+        <label for="name" class="mb-2 block text-sm font-medium text-[#7a6030]">Nombre</label>
+        <input id="name" name="name" type="text" th:value="${usuario != null ? usuario.name : ''}" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Nombre del usuario" />
+    </div>
+
+    <div>
+        <label for="email" class="mb-2 block text-sm font-medium text-[#7a6030]">Correo</label>
+        <input id="email" name="email" type="email" th:value="${usuario != null ? usuario.email : ''}" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="usuario@correo.com" />
+    </div>
+
+    <div>
+        <label for="rol_id" class="mb-2 block text-sm font-medium text-[#7a6030]">Rol</label>
+        <select id="rol_id" name="rol_id" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900">
+            <option value="">Seleccionar rol</option>
+            <option th:each="rol : ${roles}" th:value="${rol.id}" th:selected="${rol.id == selectedRolId}" th:text="${#strings.toUpperCase(rol.nombre)}"></option>
+        </select>
+    </div>
+
+    <div>
+        <label for="activo" class="mb-2 block text-sm font-medium text-[#7a6030]">Estado</label>
+        <select id="activo" name="activo" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900">
+            <option value="1" th:selected="${activo == 1}">Activo</option>
+            <option value="0" th:selected="${activo == 0}">Inactivo</option>
+        </select>
+    </div>
+
+    <div>
+        <label for="password" class="mb-2 block text-sm font-medium text-[#7a6030]">Contrasena <span th:if="${usuario != null}">(opcional)</span></label>
+        <input id="password" name="password" type="password" th:required="${usuario == null}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Minimo 6 caracteres" />
+    </div>
+
+    <div>
+        <label for="password_confirmation" class="mb-2 block text-sm font-medium text-[#7a6030]">Confirmar contrasena</label>
+        <input id="password_confirmation" name="password_confirmation" type="password" th:required="${usuario == null}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Repite la contrasena" />
+    </div>
+</div>

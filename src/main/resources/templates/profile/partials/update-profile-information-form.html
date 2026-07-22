@@ -1,0 +1,39 @@
+<section>
+    <header>
+        <h3 class="text-base font-semibold text-[#2a2419]">Datos de perfil</h3>
+        <p class="mt-1 text-sm text-[#6e6758]">Actualiza nombre y correo de la cuenta.</p>
+    </header>
+
+    <form id="send-verification" method="post" th:action="@{/verification/send}">
+        <input type="hidden" name="_token" th:value="${_csrf.token}" />
+    </form>
+
+    <form method="post" th:action="@{/profile/update}" class="mt-5 space-y-4">
+        <input type="hidden" name="_method" value="PATCH" />
+        <input type="hidden" name="_token" th:value="${_csrf.token}" />
+
+        <div>
+            <label for="name" class="mb-2 block text-sm font-medium text-[#4d4026]">Nombre</label>
+                <input id="name" name="name" type="text" th:value="${usuario.name}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12] focus:border-[#b9943d] focus:ring-[#b9943d]" required autofocus autocomplete="name" />
+        </div>
+
+        <div>
+            <label for="email" class="mb-2 block text-sm font-medium text-[#4d4026]">Correo</label>
+                <input id="email" name="email" type="email" th:value="${usuario.email}" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12] focus:border-[#b9943d] focus:ring-[#b9943d]" required autocomplete="username" />
+
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+            <button type="submit" class="rounded-xl bg-[#111] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#262626]">Guardar cambios</button>
+
+            <p
+                th:if="${session.status == 'profile-updated'}"
+                x-data="{ show: true }"
+                x-show="show"
+                x-transition
+                x-init="setTimeout(() => show = false, 2000)"
+                class="text-sm text-emerald-700"
+            >Guardado.</p>
+        </div>
+    </form>
+</section>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
+<head><title>Detalle venta - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+    <div class="space-y-5">
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Codigo</p>
+                    <p class="mt-1 text-gray-900" th:text="${venta.codigo}"></p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Fecha</p>
+                    <p class="mt-1 text-gray-900" th:text="${#temporals.format(venta.fechaVenta, 'dd/MM/yyyy')}"></p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Tipo</p>
+                    <p class="mt-1 text-gray-900" th:text="${venta.tipoVenta == 'pedido'} ? 'Cierre pedido' : 'Venta stock'"></p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Cliente</p>
+                    <p class="mt-1 text-gray-900">
+                        <span th:if="${venta.clienteNombre != null}" th:text="${venta.clienteNombre}"></span>
+                        <span th:unless="${venta.clienteNombre != null}">-</span>
+                    </p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Monto total</p>
+                    <p class="mt-1 text-gray-900">S/ <span th:text="${#numbers.formatDecimal(venta.montoTotal, 1, 2)}"></span></p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Cobrado</p>
+                    <p class="mt-1 text-gray-900">S/ <span th:text="${#numbers.formatDecimal(venta.montoCobrado, 1, 2)}"></span></p>
+                </div>
+                <div th:if="${venta.comprobante != null}">
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Comprobante</p>
+                    <p class="mt-1">
+                        <a th:href="@{/ventas/{id}/comprobante(id=${venta.id})}" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200">
+                            <span th:text="${venta.comprobante.codigo}"></span>
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </p>
+                </div>
+            </div>
+            <div th:if="${venta.pedido != null}" class="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                Relacionado al pedido <span th:text="${venta.pedido.codigo}"></span>.
+            </div>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-200 text-left text-gray-600">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Item</th>
+                            <th class="px-4 py-3 font-semibold">Cantidad</th>
+                            <th class="px-4 py-3 font-semibold">Precio unitario</th>
+                            <th class="px-4 py-3 font-semibold">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        <tr th:each="detalle : ${venta.detalles}">
+                            <td class="px-4 py-3" th:text="${detalle.productoNombre}"></td>
+                            <td class="px-4 py-3" th:text="${detalle.cantidad}"></td>
+                            <td class="px-4 py-3">S/ <span th:text="${#numbers.formatDecimal(detalle.precioUnitario, 1, 2)}"></span></td>
+                            <td class="px-4 py-3">S/ <span th:text="${#numbers.formatDecimal(detalle.subtotal, 1, 2)}"></span></td>
+                        </tr>
+                        <tr th:unless="${venta.detalles != null &amp;&amp; !venta.detalles.isEmpty()}">
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">Sin detalles registrados.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <a th:href="@{/ventas}" class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700">Volver</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

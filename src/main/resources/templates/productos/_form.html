@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<body>
+<div th:fragment="form">
+    <div
+        x-data="{
+            modalCategorias: false,
+            modalImagen: false,
+            imagenModalUrl: '',
+            imagenModalNombre: '',
+            categorias: [[${categoriasIniciales}]],
+            imagenesExistentes: [[${imagenesExistentes}]],
+            imagenesNuevas: [],
+            archivosSeleccionados: [],
+            eliminandoImagenId: null,
+            modalEliminarImagen: false,
+            imagenAEliminar: null,
+            modalAviso: false,
+            avisoError: false,
+            avisoMensaje: '',
+            productoId: [[${productoId}]],
+            productosBaseUrl: '/productos',
+            categoriaSeleccionada: '[[${categoriaSeleccionada}]]',
+            nuevaCategoria: '',
+            guardandoCategoria: false,
+            mensajeCategorias: '',
+            errorCategorias: false,
+            editandoId: null,
+            editandoNombre: '',
+            get csrf() {
+                return document.querySelector('meta[name=_csrf]')?.content || '';
+            },
+            abrirImagen(url, nombre) {
+                this.imagenModalUrl = url;
+                this.imagenModalNombre = nombre || 'Imagen';
+                this.modalImagen = true;
+            },
+            cerrarImagen() {
+                this.modalImagen = false;
+                this.imagenModalUrl = '';
+                this.imagenModalNombre = '';
+            },
+            cerrarAviso() {
+                this.modalAviso = false;
+                this.avisoError = false;
+                this.avisoMensaje = '';
+            },
+            abrirAviso(mensaje, esError = false) {
+                this.avisoMensaje = mensaje || 'Operacion realizada.';
+                this.avisoError = esError;
+                this.modalAviso = true;
+            },
+            actualizarArchivos(event) {
+                const files = Array.from(event.target.files || []);
+                if (files.length === 0) return;
+
+                files.forEach((file) => {
+                    const existe = this.archivosSeleccionados.some((f) =>
+                        f.name === file.name &&
+                        f.size === file.size &&
+                        f.lastModified === file.lastModified
+                    );
+
+                    if (existe) return;
+
+                    this.archivosSeleccionados.push(file);
+                    this.imagenesNuevas.push({
+                        uid: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+                        nombre: file.name,
+                        url: URL.createObjectURL(file),
+                    });
+                });
+
+                this.sincronizarInputImagenes();
+            },
+            quitarNuevaImagen(index) {
+                const item = this.imagenesNuevas[index];
+                if (item?.url) {
+                    URL.revokeObjectURL(item.url);
+                }
+
+                this.archivosSeleccionados.splice(index, 1);
+                this.imagenesNuevas.splice(index, 1);
+                this.sincronizarInputImagenes();
+            },
+            sincronizarInputImagenes() {
+                const dt = new DataTransfer();
+                this.archivosSeleccionados.forEach((f) => dt.items.add(f));
+
+                if (this.$refs.inputImagenes) {
+                    this.$refs.inputImagenes.files = dt.files;
+                }
+            },
+            solicitarEliminarImagen(img) {
+                this.imagenAEliminar = img;
+                this.modalEliminarImagen = true;
+            },
+            cerrarEliminarImagen() {
+                this.modalEliminarImagen = false;
+                this.imagenAEliminar = null;
+            },
+            async eliminarImagenExistenteConfirmado() {
+                const img = this.imagenAEliminar;
+                if (!this.productoId || !img?.id) return;
+
+                this.eliminandoImagenId = img.id;
+                try {
+                    const response = await fetch(`${this.productosBaseUrl}/${this.productoId}/imagenes/${img.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': this.csrf,
+                        },
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    let data = {};
+                    if (contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        const raw = await response.text();
+                        data = { message: raw ? 'Respuesta invalida del servidor.' : 'No se pudo eliminar la imagen.' };
+                    }
+
+                    if (!response.ok || !data?.ok) {
+                        this.abrirAviso(data?.message || 'No se pudo eliminar la imagen.', true);
+                        return;
+                    }
+
+                    this.imagenesExistentes = this.imagenesExistentes.filter((i) => i.id !== img.id);
+                    if (this.modalImagen && this.imagenModalUrl === img.url) {
+                        this.cerrarImagen();
+                    }
+                    this.abrirAviso(data?.message || 'Imagen eliminada correctamente.', false);
+                } catch (e) {
+                    this.abrirAviso('Error al eliminar imagen.', true);
+                } finally {
+                    this.eliminandoImagenId = null;
+                    this.cerrarEliminarImagen();
+                }
+            },
+            abrirModalCategorias() {
+                this.modalCategorias = true;
+                this.cargarCategorias();
+                this.mensajeCategorias = '';
+                this.errorCategorias = false;
+            },
+            async cargarCategorias() {
+                try {
+                    const response = await fetch('[[${@{/productos/categorias/json}}]]', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    const data = contentType.includes('application/json')
+                        ? await response.json()
+                        : null;
+                    if (response.ok && data?.ok && Array.isArray(data.categorias)) {
+                        this.categorias = data.categorias;
+                        this.mensajeCategorias = '';
+                        this.errorCategorias = false;
+                        return;
+                    }
+
+                    if ((this.categorias || []).length === 0) {
+                        this.mensajeCategorias = data?.message || `No se pudo cargar categorias (HTTP ${response.status}).`;
+                        this.errorCategorias = true;
+                    } else {
+                        this.mensajeCategorias = '';
+                        this.errorCategorias = false;
+                    }
+                } catch (e) {
+                    if ((this.categorias || []).length === 0) {
+                        this.mensajeCategorias = 'No se pudo cargar categorias.';
+                        this.errorCategorias = true;
+                    } else {
+                        this.mensajeCategorias = '';
+                        this.errorCategorias = false;
+                    }
+                }
+            },
+            async crearCategoria() {
+                const nombre = (this.nuevaCategoria || '').trim();
+                if (!nombre) {
+                    this.mensajeCategorias = 'Ingresa nombre de categoria.';
+                    this.errorCategorias = true;
+                    return;
+                }
+
+                this.guardandoCategoria = true;
+                try {
+                    const response = await fetch('[[${@{/productos/categorias/store}}]]', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrf,
+                        },
+                        body: JSON.stringify({ nombre }),
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    const data = contentType.includes('application/json')
+                        ? await response.json()
+                        : { ok: false, message: `Respuesta no JSON (HTTP ${response.status}).` };
+                    if (!response.ok || !data?.ok) {
+                        this.mensajeCategorias = data?.message || `No se pudo crear categoria (HTTP ${response.status}).`;
+                        this.errorCategorias = true;
+                        return;
+                    }
+
+                    this.nuevaCategoria = '';
+                    this.mensajeCategorias = data.message || 'Categoria creada.';
+                    this.errorCategorias = false;
+                    await this.cargarCategorias();
+                } catch (e) {
+                    this.mensajeCategorias = 'Error al crear categoria (conexion o sesion).';
+                    this.errorCategorias = true;
+                } finally {
+                    this.guardandoCategoria = false;
+                }
+            },
+            iniciarEdicion(categoria) {
+                this.editandoId = categoria.id;
+                this.editandoNombre = categoria.nombre;
+            },
+            cancelarEdicion() {
+                this.editandoId = null;
+                this.editandoNombre = '';
+            },
+            async guardarEdicion(categoria) {
+                const nombre = (this.editandoNombre || '').trim();
+                if (!nombre) {
+                    this.mensajeCategorias = 'Ingresa nombre valido.';
+                    this.errorCategorias = true;
+                    return;
+                }
+
+                this.guardandoCategoria = true;
+                try {
+                    const response = await fetch(`/productos/categorias/${categoria.id}`, {
+                        method: 'PUT',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrf,
+                        },
+                        body: JSON.stringify({ nombre }),
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    const data = contentType.includes('application/json')
+                        ? await response.json()
+                        : { ok: false, message: `Respuesta no JSON (HTTP ${response.status}).` };
+                    if (!response.ok || !data?.ok) {
+                        this.mensajeCategorias = data?.message || 'No se pudo actualizar categoria.';
+                        this.errorCategorias = true;
+                        return;
+                    }
+
+                    this.mensajeCategorias = data.message || 'Categoria actualizada.';
+                    this.errorCategorias = false;
+                    this.cancelarEdicion();
+                    await this.cargarCategorias();
+                } catch (e) {
+                    this.mensajeCategorias = 'Error al actualizar categoria.';
+                    this.errorCategorias = true;
+                } finally {
+                    this.guardandoCategoria = false;
+                }
+            },
+            async toggleCategoria(categoria) {
+                this.guardandoCategoria = true;
+                try {
+                    const response = await fetch(`/productos/categorias/${categoria.id}/toggle`, {
+                        method: 'PATCH',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': this.csrf,
+                        },
+                    });
+                    const contentType = response.headers.get('content-type') || '';
+                    const data = contentType.includes('application/json')
+                        ? await response.json()
+                        : { ok: false, message: `Respuesta no JSON (HTTP ${response.status}).` };
+                    if (!response.ok || !data?.ok) {
+                        this.mensajeCategorias = data?.message || 'No se pudo actualizar estado.';
+                        this.errorCategorias = true;
+                        return;
+                    }
+
+                    this.mensajeCategorias = data.message || 'Estado actualizado.';
+                    this.errorCategorias = false;
+                    await this.cargarCategorias();
+                } catch (e) {
+                    this.mensajeCategorias = 'Error al cambiar estado.';
+                    this.errorCategorias = true;
+                } finally {
+                    this.guardandoCategoria = false;
+                }
+            }
+        }"
+    >
+        <div class="grid gap-4 md:grid-cols-2">
+            <div>
+                <label for="codigo" class="mb-2 block text-sm font-medium text-[#7a6030]">Codigo</label>
+                <input
+                    id="codigo"
+                    type="text"
+                    th:value="${producto != null and producto.id != null} ? ${producto.codigo} : 'Se genera automaticamente al guardar'"
+                    readonly
+                    class="block w-full rounded-xl border border-[#d1be8a] bg-[#f5f0e3] px-4 py-3 text-[#666]"
+                />
+            </div>
+
+            <div>
+                <label for="nombre" class="mb-2 block text-sm font-medium text-[#7a6030]">Nombre</label>
+                <input id="nombre" name="nombre" type="text" th:value="${producto != null} ? ${producto.nombre} : ''" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Nombre del producto" />
+                <p th:if="${#fields.hasErrors('nombre')}" th:errors="*{nombre}" class="mt-1 text-sm text-rose-600"></p>
+            </div>
+
+            <div>
+                <label for="categoria" class="mb-2 block text-sm font-medium text-[#7a6030]">Categoria</label>
+                <div class="flex items-center gap-2">
+                    <select id="categoria" name="categoria" x-model="categoriaSeleccionada" required class="block h-12 w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 text-gray-900">
+                        <template x-for="cat in categorias.filter(c => c.activo || c.slug === categoriaSeleccionada)" :key="cat.id">
+                            <option :value="cat.slug" x-text="cat.nombre"></option>
+                        </template>
+                    </select>
+                    <button
+                        type="button"
+                        @click="abrirModalCategorias()"
+                        class="btn-icon" style="background-color:#9333EA"
+                        title="Gestionar categorias"
+                    >
+                        <img th:src="@{/icons/gestionar-categorias.png}" alt="Categorias" class="h-5 w-5 object-contain pointer-events-none" />
+                    </button>
+                </div>
+                <p th:if="${#fields.hasErrors('categoria')}" th:errors="*{categoria}" class="mt-1 text-sm text-rose-600"></p>
+            </div>
+
+            <div>
+                <label for="precio_referencia" class="mb-2 block text-sm font-medium text-[#7a6030]">Precio referencia</label>
+                <input id="precio_referencia" name="precio_referencia" type="number" step="0.01" min="0" th:value="${producto != null} ? ${producto.precioReferencia} : ''" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="0.00" />
+                <p th:if="${#fields.hasErrors('precioReferencia')}" th:errors="*{precioReferencia}" class="mt-1 text-sm text-rose-600"></p>
+            </div>
+
+            <div>
+                <label for="stock_almacen" class="mb-2 block text-sm font-medium text-[#7a6030]">Stock en almacen</label>
+                <input id="stock_almacen" name="stock_almacen" type="number" min="0" th:value="${producto != null} ? ${producto.stockAlmacen} : 0" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" />
+                <p th:if="${#fields.hasErrors('stockAlmacen')}" th:errors="*{stockAlmacen}" class="mt-1 text-sm text-rose-600"></p>
+            </div>
+            <div>
+                <label for="stock_tienda" class="mb-2 block text-sm font-medium text-[#7a6030]">Stock en tienda</label>
+                <input id="stock_tienda" name="stock_tienda" type="number" min="0" th:value="${producto != null} ? ${producto.stockTienda} : 0" required class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" />
+                <p th:if="${#fields.hasErrors('stockTienda')}" th:errors="*{stockTienda}" class="mt-1 text-sm text-rose-600"></p>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <label for="descripcion" class="mb-2 block text-sm font-medium text-[#7a6030]">Descripcion</label>
+            <textarea id="descripcion" name="descripcion" rows="3" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-gray-900" placeholder="Detalle del producto" th:text="${producto != null} ? ${producto.descripcion} : ''"></textarea>
+            <p th:if="${#fields.hasErrors('descripcion')}" th:errors="*{descripcion}" class="mt-1 text-sm text-rose-600"></p>
+        </div>
+
+        <div class="mt-4">
+            <label for="imagenes" class="mb-2 block text-sm font-medium text-[#7a6030]">Imagenes del producto</label>
+
+            <div class="rounded-xl border border-[#d1be8a] bg-[#fffdf7] p-3">
+                <input
+                    x-ref="inputImagenes"
+                    id="imagenes"
+                    name="imagenes[]"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                    multiple
+                    @change="actualizarArchivos($event)"
+                    class="block w-full rounded-lg border border-[#d1be8a] bg-white px-3 py-2 text-gray-900"
+                />
+                <p class="mt-2 text-xs text-[#777]">Puedes seleccionar varias imagenes a la vez (JPG, PNG, WEBP).</p>
+                <p th:if="${#fields.hasErrors('imagenes')}" th:errors="*{imagenes}" class="mt-2 text-sm text-rose-600"></p>
+                <p th:if="${#fields.hasErrors('imagenes[' + #strings.arraySplit(#strings.arrayJoin(#fields.errors('imagenes'), ','), ',')[0] + ']')}" class="mt-2 text-sm text-rose-600"></p>
+
+                <div class="mt-3 border-t border-[#efe7d2] pt-3">
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" x-show="imagenesExistentes.length > 0 || imagenesNuevas.length > 0">
+                        <template x-for="(img, idx) in imagenesExistentes" :key="'exist-'+img.id">
+                            <div class="relative overflow-hidden rounded-xl border border-[#e5dec8] bg-[#fcf9f3]">
+                                <button
+                                    type="button"
+                                    @click="abrirImagen(img.url, img.nombre)"
+                                    class="block w-full"
+                                    title="Ver imagen"
+                                >
+                                    <img :src="img.url" :alt="img.nombre" class="h-28 w-full object-cover" />
+                                </button>
+                                <div class="flex items-center justify-between gap-2 px-2 py-1.5">
+                                    <p class="truncate text-[11px] text-[#4a4026]" x-text="img.nombre"></p>
+                                    <button
+                                        type="button"
+                                        @click="solicitarEliminarImagen(img)"
+                                        :disabled="eliminandoImagenId === img.id"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-300 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                                        title="Eliminar imagen"
+                                    >
+                                        <span class="text-base leading-none">x</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-for="(img, idx) in imagenesNuevas" :key="img.uid">
+                            <div class="relative overflow-hidden rounded-xl border border-[#e5dec8] bg-[#fcf9f3]">
+                                <button
+                                    type="button"
+                                    @click="abrirImagen(img.url, img.nombre)"
+                                    class="block w-full"
+                                    title="Ver imagen"
+                                >
+                                    <img :src="img.url" :alt="img.nombre" class="h-28 w-full object-cover" />
+                                </button>
+                                <div class="flex items-center justify-between gap-2 px-2 py-1.5">
+                                    <p class="truncate text-[11px] text-[#4a4026]" x-text="img.nombre"></p>
+                                    <button
+                                        type="button"
+                                        @click="quitarNuevaImagen(idx)"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
+                                        title="Quitar imagen"
+                                    >
+                                        <span class="text-base leading-none">x</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p x-show="imagenesExistentes.length === 0 && imagenesNuevas.length === 0" class="text-xs text-[#777]">Aun no hay imagenes para mostrar.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <label class="inline-flex items-center text-sm text-[#5a4314]">
+                <input type="checkbox" name="activo" value="1" th:checked="${producto != null} ? ${producto.activo} : true" class="rounded border-[#d1be8a] bg-[#fffdf7] text-[#8a6a2e] focus:ring-[#d1be8a]" />
+                <span class="ms-2">Activo</span>
+            </label>
+        </div>
+
+        <template x-teleport="body">
+            <div x-show="modalImagen" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-[70] bg-black/70" @click="cerrarImagen()"></div>
+                <div x-transition class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+                    <div class="relative w-full max-w-4xl rounded-2xl border border-[#e5dec8] bg-white p-3 shadow-xl" @click.stop>
+                        <button
+                            type="button"
+                            @click="cerrarImagen()"
+                            class="btn-icon-sm bg-red-600 hover:bg-red-700 absolute right-3 top-3"
+                            title="Cerrar"
+                        >
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                        </button>
+                        <img :src="imagenModalUrl" :alt="imagenModalNombre" class="max-h-[80vh] w-full rounded-xl object-contain" />
+                        <p class="mt-2 truncate px-1 text-center text-xs text-[#777]" x-text="imagenModalNombre"></p>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-teleport="body">
+            <div x-show="modalEliminarImagen" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-[90] bg-black/70" @click="cerrarEliminarImagen()"></div>
+                <div x-transition class="fixed inset-0 z-[95] flex items-center justify-center p-4">
+                    <div class="w-full max-w-lg rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-[#efe7d2] px-5 py-3">
+                            <h3 class="text-base font-semibold text-[#2a2419]">Eliminar imagen</h3>
+                            <button type="button" @click="cerrarEliminarImagen()" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                            </button>
+                        </div>
+                        <div class="space-y-4 p-5">
+                            <p class="text-sm text-[#4a4026]">Confirma si deseas eliminar esta imagen del producto.</p>
+                            <template x-if="imagenAEliminar">
+                                <div class="overflow-hidden rounded-xl border border-[#e5dec8] bg-[#fcf9f3]">
+                                    <img :src="imagenAEliminar.url" :alt="imagenAEliminar.nombre" class="h-52 w-full object-contain bg-[#fcf9f3]" />
+                                    <p class="truncate px-3 py-2 text-xs text-[#4a4026]" x-text="imagenAEliminar.nombre"></p>
+                                </div>
+                            </template>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" @click="cerrarEliminarImagen()" class="rounded-xl border border-[#d1be8a] px-4 py-2 text-sm font-medium text-[#5a4314] hover:bg-[#fff5dd]">Cancelar</button>
+                                <button type="button" @click="eliminarImagenExistenteConfirmado()" :disabled="eliminandoImagenId !== null" class="rounded-xl border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-60">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-teleport="body">
+            <div x-show="modalAviso" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-[96] bg-black/50" @click="cerrarAviso()"></div>
+                <div x-transition class="fixed inset-0 z-[97] flex items-center justify-center p-4">
+                    <div class="w-full max-w-md rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                        <div class="border-b border-[#efe7d2] px-5 py-3">
+                            <h3 class="text-base font-semibold" :class="avisoError ? 'text-rose-700' : 'text-emerald-700'" x-text="avisoError ? 'Error' : 'Listo'"></h3>
+                        </div>
+                        <div class="space-y-4 p-5">
+                            <p class="text-sm text-[#4a4026]" x-text="avisoMensaje"></p>
+                            <div class="flex justify-end">
+                                <button type="button" @click="cerrarAviso()" class="rounded-xl border border-[#d1be8a] px-4 py-2 text-sm font-medium text-[#5a4314] hover:bg-[#fff5dd]">Aceptar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-teleport="body">
+            <div x-show="modalCategorias" style="display: none;">
+                <div x-transition.opacity class="fixed inset-0 z-50 bg-black/50" @click="modalCategorias = false"></div>
+                <div x-transition class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div class="w-full max-w-2xl rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-[#efe7d2] px-5 py-3">
+                            <h3 class="text-base font-semibold text-[#2a2419]">Gestionar categorias</h3>
+                            <button type="button" @click="modalCategorias = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                            </button>
+                        </div>
+
+                        <div class="space-y-4 p-5">
+                            <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                                <input x-model="nuevaCategoria" type="text" class="rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm" placeholder="Nueva categoria" />
+                                <button type="button" @click="crearCategoria()" :disabled="guardandoCategoria" class="btn-icon bg-[#111] hover:bg-[#262626] disabled:opacity-60" title="Crear categoria">
+                                    <img th:src="@{/icons/nuevo.ico}" alt="Crear" class="h-5 w-5 object-contain pointer-events-none" />
+                                </button>
+                            </div>
+
+                            <p x-show="mensajeCategorias" class="text-xs" :class="errorCategorias ? 'text-rose-700' : 'text-emerald-700'" x-text="mensajeCategorias"></p>
+
+                            <div class="max-h-80 overflow-auto rounded-xl border border-[#e5dec8]">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                                        <tr>
+                                            <th class="px-3 py-2 font-semibold">Nombre</th>
+                                            <th class="px-3 py-2 font-semibold">Slug</th>
+                                            <th class="px-3 py-2 font-semibold">Estado</th>
+                                            <th class="px-3 py-2 font-semibold text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-[#efeee9]">
+                                        <template x-for="cat in categorias" :key="cat.id">
+                                            <tr>
+                                                <td class="px-3 py-2 text-[#4a4026]">
+                                                    <template x-if="editandoId !== cat.id">
+                                                        <span x-text="cat.nombre"></span>
+                                                    </template>
+                                                    <template x-if="editandoId === cat.id">
+                                                        <input x-model="editandoNombre" type="text" class="w-full rounded-lg border border-[#d1be8a] px-2 py-1 text-sm" />
+                                                    </template>
+                                                </td>
+                                                <td class="px-3 py-2 text-xs text-[#777]" x-text="cat.slug"></td>
+                                                <td class="px-3 py-2">
+                                                    <span class="rounded-lg px-2 py-1 text-xs font-medium" :class="cat.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'" x-text="cat.activo ? 'Activo' : 'Inactivo'"></span>
+                                                </td>
+                                                <td class="px-3 py-2">
+                                                    <div class="flex justify-end gap-2">
+                                                        <template x-if="editandoId !== cat.id">
+                                                            <button type="button" @click="iniciarEdicion(cat)" class="rounded-lg border border-[#d1be8a] px-2.5 py-1 text-xs text-[#5a4314] hover:bg-[#fff5dd]">Editar</button>
+                                                        </template>
+                                                        <template x-if="editandoId === cat.id">
+                                                            <button type="button" @click="guardarEdicion(cat)" class="rounded-lg border border-emerald-300 px-2.5 py-1 text-xs text-emerald-700 hover:bg-emerald-50">Guardar</button>
+                                                        </template>
+                                                        <template x-if="editandoId === cat.id">
+                                                            <button type="button" @click="cancelarEdicion()" class="rounded-lg border border-[#d1be8a] px-2.5 py-1 text-xs text-[#5a4314] hover:bg-[#fff5dd]">Cancelar</button>
+                                                        </template>
+                                                        <button type="button" @click="toggleCategoria(cat)" :class="cat.activo ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'" class="rounded-lg border px-2.5 py-1 text-xs">
+                                                            <span x-text="cat.activo ? 'Inactivar' : 'Activar'"></span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="categorias.length === 0">
+                                            <td colspan="4" class="px-3 py-4 text-center text-[#777]">Sin categorias registradas.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+</body>
+</html>

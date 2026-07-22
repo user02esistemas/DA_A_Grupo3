@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<body>
+<div layout:fragment="content">
+    <div class="rounded-2xl border border-[#e5dec8] bg-white p-6 shadow-sm">
+        <div class="grid gap-4 md:grid-cols-2">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Codigo</p>
+                <p class="mt-1 text-[#1f1f1f]" th:text="${producto.codigo}">COD</p>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Estado</p>
+                <p class="mt-1 text-[#1f1f1f]" th:text="${producto.activo} ? 'Activo' : 'Inactivo'">Estado</p>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Nombre</p>
+                <p class="mt-1 text-[#1f1f1f]" th:text="${producto.nombre}">Nombre</p>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Categoria</p>
+                <p class="mt-1 text-[#1f1f1f]" th:text="${categoriasMap[producto.categoria] ?: producto.categoria}">Categoria</p>
+            </div>
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Precio referencia</p>
+                <p class="mt-1 text-[#1f1f1f]" th:text="${producto.precioReferencia != null} ? 'S/ ' + ${#numbers.formatDecimal(producto.precioReferencia, 1, 2)} : '-'">Precio</p>
+            </div>
+            <div class="col-span-2">
+                <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Stock</p>
+                <div class="mt-1 flex gap-6 text-[#1f1f1f]">
+                    <span>Tienda: <strong th:text="${producto.stockTienda != null} ? ${producto.stockTienda} : 0">0</strong></span>
+                    <span>Almacen: <strong th:text="${producto.stockAlmacen != null} ? ${producto.stockAlmacen} : 0">0</strong></span>
+                    <span class="text-[#8a6a2e]">| Total: <strong th:text="${producto.stockActual}">0</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Descripcion</p>
+            <p class="mt-1 text-[#1f1f1f]" th:text="${producto.descripcion != null and producto.descripcion != ''} ? ${producto.descripcion} : '-'">-</p>
+        </div>
+
+        <div class="mt-6">
+            <p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Imagenes</p>
+
+            <p th:if="${#lists.isEmpty(producto.imagenes)}" class="mt-2 text-sm text-[#777]">No hay imagenes registradas para este producto.</p>
+            <div th:unless="${#lists.isEmpty(producto.imagenes)}" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <a th:each="imagen : ${producto.imagenes}"
+                   th:href="@{/productos/imagen/ver/{id}(id=${imagen.id})}"
+                   target="_blank"
+                   class="block overflow-hidden rounded-xl border border-[#e5dec8] bg-[#fcf9f3]">
+                    <img th:src="@{/productos/imagen/ver/{id}(id=${imagen.id})}" th:alt="${imagen.nombreOriginal}" class="h-40 w-full object-cover" />
+                    <div class="px-3 py-2 text-xs text-[#4a4026]" th:text="${imagen.nombreOriginal}">Imagen</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-6 flex gap-2">
+            <a th:href="@{/productos/{id}/edit(id=${producto.id})}" class="rounded-xl bg-[#111] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#262626]">Editar</a>
+            <a th:href="@{/productos}" class="rounded-xl border border-[#d1be8a] px-4 py-2.5 text-sm font-medium text-[#5a4314] hover:bg-[#fff5dd]">Volver</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

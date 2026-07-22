@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="pagination(page)" th:if="${page != null and page.totalPages > 1}" class="flex items-center justify-between gap-3" aria-label="Paginacion">
+    <a th:if="${page.hasPrevious()}" th:href="@{''(page=${page.number - 1})}" class="rounded-xl border border-[#d1be8a] px-3 py-2 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Anterior</a>
+    <span th:unless="${page.hasPrevious()}" class="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-400">Anterior</span>
+    <span class="text-sm text-[#6e6758]">Pagina <strong th:text="${page.number + 1}">1</strong> de <strong th:text="${page.totalPages}">1</strong></span>
+    <a th:if="${page.hasNext()}" th:href="@{''(page=${page.number + 1})}" class="rounded-xl border border-[#d1be8a] px-3 py-2 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Siguiente</a>
+    <span th:unless="${page.hasNext()}" class="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-400">Siguiente</span>
+</nav>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
+<head><title>Notificaciones - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+    <div class="space-y-5">
+        <div th:if="${session.success}" class="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" th:text="${session.success}"></div>
+
+        <div class="rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-[#e5dec8] px-5 py-3">
+                <h3 class="text-sm font-semibold text-gray-800">Historial de notificaciones</h3>
+                <form th:if="${not #lists.isEmpty(notifications)}" method="POST" th:action="@{/notificaciones/read-all}">
+                    <input type="hidden" name="_token" th:value="${_csrf.token}" />
+                    <button type="submit" class="rounded-lg border border-[#e5dec8] px-3 py-1.5 text-xs font-medium text-[#7a5b25] hover:bg-[#fff5dd]">Marcar todo leido</button>
+                </form>
+            </div>
+
+            <div class="divide-y divide-[#e5dec8]">
+                <div th:each="notification : ${notifications}" class="flex items-start gap-4 px-5 py-3" th:classappend="${!notification.isRead} ? ' bg-[#fffbf5]' : ''">
+                    <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full" th:classappend="${!notification.isRead} ? ' bg-[#b9943d]/20 text-[#7a5b25]' : ' bg-gray-100 text-gray-400'">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-sm font-semibold" th:classappend="${!notification.isRead} ? ' text-gray-900' : ' text-gray-500'" th:text="${notification.title}"></p>
+                            <span class="shrink-0 text-[10px] text-gray-400" th:text="${#temporals.format(notification.createdAt, 'dd/MM/yyyy HH:mm')}"></span>
+                        </div>
+                        <p class="mt-0.5 text-sm text-gray-500" th:text="${notification.body}"></p>
+                        <div class="mt-2 flex items-center gap-3">
+                            <a th:if="${notification.actionUrl != null}" th:href="${notification.actionUrl}" class="rounded-lg border border-[#e5dec8] px-3 py-1.5 text-xs font-medium text-[#7a5b25] hover:bg-[#fff5dd]">Ver detalle</a>
+                            <form th:if="${!notification.isRead}" method="POST" th:action="@{/notificaciones/{id}(id=${notification.id})}">
+                                <input type="hidden" name="_token" th:value="${_csrf.token}" />
+                                <button type="submit" class="text-xs text-[#7a5b25] hover:underline">Marcar leido</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div th:if="${#lists.isEmpty(notifications)}" class="px-5 py-8 text-center text-sm text-gray-400">No tienes notificaciones</div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+</body>
+</html>
