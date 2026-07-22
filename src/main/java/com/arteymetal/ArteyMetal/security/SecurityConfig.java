@@ -105,7 +105,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/css/**", "/js/**", "/icons/**", "/images/**", "/img/**", "/favicon.ico", "/favicon.png").permitAll()
+                .requestMatchers("/login", "/register", "/forgot-password", "/reset-password-code", "/confirm-password", "/verify-email").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/icons/**", "/images/**", "/img/**", "/favicon.ico", "/favicon.png").permitAll()
                 .requestMatchers("/").permitAll()
                 .anyRequest().authenticated()
             )

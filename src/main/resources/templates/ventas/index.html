@@ -1,41 +1,241 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
-<body><div layout:fragment="content">
-<style>.btn-icon{display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;border-radius:.75rem;flex-shrink:0;color:#fff}.btn-icon-sm{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:.5rem;flex-shrink:0;color:#fff}.btn-icon:active,.btn-icon-sm:active{filter:brightness(.85)}</style>
-<div x-data="{filtrosAbiertos:false,selectorCajaAbierto:false,sinCajaAbierto:false,detalleId:null,comprobanteUrl:''}"
-     x-init="selectorCajaAbierto=$el.dataset.selector==='true';sinCajaAbierto=$el.dataset.sinCaja==='true'"
-     th:attr="data-selector=${caja == null and !#lists.isEmpty(cajasAbiertas)},data-sin-caja=${sinCaja and #lists.isEmpty(cajasAbiertas)}" class="space-y-5">
-  <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
-    <div class="flex items-center gap-2">
-      <div class="flex min-w-0 flex-1 items-center gap-3">
-        <div th:if="${caja != null}" class="shrink-0 flex h-10 items-center rounded-lg bg-[#f4ebd4] px-3 text-xs text-[#6a5122]">
-          <span th:text="${caja.nombre != null ? caja.nombre : 'Caja #' + caja.id}">Caja</span><span class="ml-1 text-emerald-600">Abierta</span>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
+<head><title>Ventas - ARTE Y METAL</title></head>
+<body>
+<div layout:fragment="content">
+
+<style>
+.btn-icon:focus-visible,.btn-icon:focus,.btn-icon-sm:focus-visible,.btn-icon-sm:focus{outline:0 none!important}
+.btn-icon:active,.btn-icon-sm:active{filter:brightness(.85)}
+.btn-icon{display:inline-flex;align-items:center;justify-content:center;width:2.5rem;height:2.5rem;border-radius:.75rem;flex-shrink:0;color:#fff}
+.btn-icon.is-active{filter:brightness(.8)}
+.btn-icon-sm{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:.5rem;flex-shrink:0;color:#fff}
+</style>
+
+<div x-data="{ modalVenta: false, ventaVista: null, modalComprobante: false, urlComprobante: '', filtrosAbiertos: false, selectorCajaAbierto: false, sinCajaAbierto: false }"
+     x-init="selectorCajaAbierto = $el.dataset.selector === 'true'; sinCajaAbierto = $el.dataset.sinCaja === 'true'"
+     th:attr="data-selector=${caja == null and !#lists.isEmpty(cajasAbiertas)},data-sin-caja=${sinCaja != null and sinCaja and #lists.isEmpty(cajasAbiertas)}"
+     class="space-y-5">
+
+    <!-- Barra de herramientas -->
+    <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
+        <div class="flex items-center gap-2">
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+                <div th:if="${caja != null}" class="shrink-0 flex items-center rounded-lg bg-[#f4ebd4] px-3 text-xs text-[#6a5122] h-10">
+                    <span th:text="${caja.nombre != null ? caja.nombre : 'Caja #' + caja.id}"></span>
+                    <span class="ml-1 text-emerald-600">Abierta</span>
+                </div>
+                <form id="search-form" method="GET" th:action="@{/ventas}" class="flex min-w-0 flex-1">
+                    <input type="hidden" name="scope" th:value="${scope}" />
+                    <input type="text" name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm text-gray-900" placeholder="Buscar por codigo, cliente o tipo" />
+                </form>
+            </div>
+            <button type="submit" form="search-form" class="btn-icon bg-blue-600 hover:bg-blue-700" title="Buscar">
+                <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none" />
+            </button>
+            <button type="button" @click="filtrosAbiertos = !filtrosAbiertos" class="btn-icon bg-sky-500 hover:bg-sky-600" title="Filtrar"
+                :class="{ 'is-active': filtrosAbiertos || '${tipo != null ? tipo : ''}' !== '' || '${scope != null ? scope : \"todas\"}' !== 'todas' }">
+                <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none" />
+            </button>
+            <a th:if="${!#strings.isEmpty(busqueda) or !#strings.isEmpty(tipo)}" th:href="@{/ventas(scope=${scope})}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+            <form method="POST" th:action="@{/ventas/cambiar-caja}" class="inline">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button type="submit" class="btn-icon bg-amber-600 hover:bg-amber-700" title="Cambiar caja">
+                    <svg class="h-5 w-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                </button>
+            </form>
+            <a th:if="${#authorization.expression('hasAuthority(''ventas.gestionar'')')}" th:href="@{/ventas/create}" class="btn-icon" style="background-color:#09090f;color:white" title="Nueva venta">
+                <img th:src="@{/icons/nuevo.ico}" alt="Nuevo" class="h-5 w-5 object-contain pointer-events-none" />
+            </a>
         </div>
-        <form id="search-form" method="get" th:action="@{/ventas}" class="flex min-w-0 flex-1">
-          <input type="hidden" name="scope" th:value="${scope}"><input name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm" placeholder="Buscar por codigo, cliente o tipo">
+
+        <!-- Filtros -->
+        <form x-show="filtrosAbiertos" x-transition method="GET" th:action="@{/ventas}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
+            <input type="hidden" name="q" th:value="${busqueda}" />
+            <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Tipo</label>
+                <select name="tipo" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm">
+                    <option value="">Todos</option>
+                    <option value="stock" th:selected="${tipo != null and tipo == 'stock'}">Venta stock</option>
+                    <option value="pedido" th:selected="${tipo != null and tipo == 'pedido'}">Cierre pedido</option>
+                </select>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Mostrar</label>
+                <select name="scope" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="mi_caja" th:selected="${scope != null and scope == 'mi_caja'}">Mi caja</option>
+                    <option value="todas" th:selected="${scope == null or scope == 'todas'}">Todas</option>
+                </select>
+            </div>
+            <button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500">Filtrar</button>
         </form>
-      </div>
-      <button form="search-form" class="btn-icon bg-blue-600" title="Buscar"><img src="/icons/buscar.ico" class="h-5 w-5" alt="Buscar"></button>
-      <button type="button" @click="filtrosAbiertos=!filtrosAbiertos" class="btn-icon bg-sky-500" title="Filtrar"><img src="/icons/filtros.ico" class="h-5 w-5" alt="Filtrar"></button>
-      <a th:if="${!#strings.isEmpty(busqueda) or !#strings.isEmpty(tipo)}" th:href="@{/ventas(scope=${scope})}" class="rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314]">Limpiar</a>
-      <form method="post" th:action="@{/ventas/cambiar-caja}"><button class="btn-icon bg-amber-600" title="Cambiar caja"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0-4-4m4 4-4 4m0 6H4m0 0 4 4m-4-4 4-4"/></svg></button></form>
-      <a th:href="@{/ventas/create}" class="btn-icon bg-[#09090f]" title="Nueva venta"><img src="/icons/nuevo.ico" class="h-5 w-5" alt="Nuevo"></a>
     </div>
-    <form x-show="filtrosAbiertos" x-transition method="get" th:action="@{/ventas}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
-      <input type="hidden" name="q" th:value="${busqueda}"><div><label class="mb-1.5 block text-xs font-semibold uppercase text-gray-600">Tipo</label><select name="tipo" class="rounded-xl border-[#d1be8a]"><option value="">Todos</option><option value="stock" th:selected="${tipo=='stock'}">Venta stock</option><option value="pedido" th:selected="${tipo=='pedido'}">Cierre pedido</option></select></div>
-      <div><label class="mb-1.5 block text-xs font-semibold uppercase text-gray-600">Mostrar</label><select name="scope" class="rounded-xl border-[#d1be8a]"><option value="mi_caja" th:selected="${scope=='mi_caja'}">Mi caja</option><option value="todas" th:selected="${scope=='todas'}">Todas</option></select></div>
-      <button class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white">Filtrar</button>
-    </form>
-  </div>
-  <div class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full text-sm">
-    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]"><tr><th class="px-4 py-3">Codigo</th><th class="px-4 py-3">Fecha</th><th class="px-4 py-3">Tipo</th><th class="px-4 py-3">Comprobante</th><th class="px-4 py-3">Cliente</th><th class="px-4 py-3">Monto</th><th class="px-4 py-3">Cobrado</th><th class="px-4 py-3 text-right">Acciones</th></tr></thead>
-    <tbody class="divide-y divide-[#efeee9]"><tr th:each="v:${ventas.content}">
-      <td class="px-4 py-3 font-medium" th:text="${v.codigo}"></td><td class="px-4 py-3" th:text="${#temporals.format(v.fechaVenta,'dd/MM/yyyy')}"></td><td class="px-4 py-3" th:text="${v.tipoVenta=='pedido'?'Cierre pedido':'Venta stock'}"></td>
-      <td class="px-4 py-3"><th:block th:if="${v.comprobante!=null}"><span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs" th:text="${#strings.toUpperCase(v.comprobante.tipoComprobante)}"></span><p class="mt-1 text-xs text-gray-500" th:text="${v.comprobante.codigo}"></p></th:block><span th:if="${v.comprobante==null}">-</span></td>
-      <td class="px-4 py-3" th:text="${#strings.isEmpty(v.clienteNombre)?'-':v.clienteNombre}"></td><td class="px-4 py-3" th:text="${'S/ '+#numbers.formatDecimal(v.montoTotal,1,2)}"></td><td class="px-4 py-3" th:text="${'S/ '+#numbers.formatDecimal(v.montoCobrado,1,2)}"></td>
-      <td class="px-4 py-3"><div class="flex justify-end gap-2"><a th:href="@{/ventas/{id}(id=${v.id})}" class="btn-icon-sm bg-cyan-600" title="Ver detalle"><img src="/icons/ver-detalle.ico" class="h-4 w-4" alt="Ver"></a><a th:if="${v.comprobante!=null}" th:href="@{/ventas/{id}/comprobante(id=${v.id})}" target="_blank" class="btn-icon-sm bg-slate-500" title="Imprimir"><img src="/icons/imprimir.ico" class="h-4 w-4" alt="Imprimir"></a><form th:if="${v.comprobante==null}" method="post" th:action="@{/ventas/{id}/emitir-comprobante(id=${v.id})}"><button class="btn-icon-sm bg-slate-500"><img src="/icons/imprimir.ico" class="h-4 w-4" alt="Emitir"></button></form></div></td>
-    </tr><tr th:if="${ventas.empty}"><td colspan="8" class="px-4 py-8 text-center text-gray-500">No hay ventas registradas.</td></tr></tbody>
-  </table></div><div th:if="${ventas.totalPages>1}" class="border-t px-4 py-3" th:replace="~{fragments/pagination :: pagination(${ventas})}"></div></div>
-  <div x-show="selectorCajaAbierto" style="display:none"><div class="fixed inset-0 z-40 bg-black/50"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-lg rounded-2xl bg-white shadow-xl"><div class="border-b px-5 py-4"><h3 class="font-semibold">Seleccionar caja abierta</h3><p class="text-sm text-gray-500">Elige la caja con la que registrarás ventas.</p></div><div class="space-y-3 p-5"><form th:each="c:${cajasAbiertas}" method="post" th:action="@{/ventas/seleccionar-caja/{id}(id=${c.id})}"><button class="flex w-full items-center justify-between rounded-xl border border-[#e5dec8] p-4 text-left hover:bg-[#fffaf0]"><span th:text="${c.nombre!=null?c.nombre:'Caja #'+c.id}"></span><span class="text-sm font-semibold text-emerald-600">Seleccionar</span></button></form></div></div></div></div>
-  <div x-show="sinCajaAbierto" style="display:none"><div class="fixed inset-0 z-40 bg-black/50"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-xl"><h3 class="text-lg font-semibold">No tienes una caja abierta</h3><p class="mt-2 text-sm text-gray-500">Abre una caja antes de registrar ventas.</p><a href="/caja" class="mt-5 inline-block rounded-xl bg-[#111] px-5 py-2.5 text-white">Ir a Caja</a></div></div></div>
-</div></div></body></html>
+
+    <!-- Tabla de ventas -->
+    <div class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                    <tr>
+                        <th class="px-4 py-3 font-semibold">Codigo</th>
+                        <th class="px-4 py-3 font-semibold">Fecha</th>
+                        <th class="px-4 py-3 font-semibold">Tipo</th>
+                        <th class="px-4 py-3 font-semibold">Comprobante</th>
+                        <th class="px-4 py-3 font-semibold">Cliente</th>
+                        <th class="px-4 py-3 font-semibold">Monto</th>
+                        <th class="px-4 py-3 font-semibold">Cobrado</th>
+                        <th class="px-4 py-3 font-semibold text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#efeee9]">
+                    <tr th:each="v : ${ventas}">
+                        <td class="px-4 py-3 font-medium text-[#2d2b24]" th:text="${v.codigo}"></td>
+                        <td class="px-4 py-3 text-[#4a4026]" th:text="${#temporals.format(v.fechaVenta, 'dd/MM/yyyy')}"></td>
+                        <td class="px-4 py-3 text-[#4a4026]" th:text="${v.tipoVenta == 'pedido' ? 'Cierre pedido' : 'Venta stock'}"></td>
+                        <td class="px-4 py-3 text-[#4a4026]">
+                            <th:block th:if="${v.comprobante != null}">
+                                <span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-medium text-[#6a5122]" th:text="${#strings.toUpperCase(v.comprobante.tipoComprobante)}"></span>
+                                <p class="mt-1 text-xs text-[#6e6e6e]" th:text="${v.comprobante.codigo}"></p>
+                            </th:block>
+                            <span th:if="${v.comprobante == null}">-</span>
+                        </td>
+                        <td class="px-4 py-3 text-[#4a4026]" th:text="${#strings.isEmpty(v.clienteNombre) ? '-' : v.clienteNombre}"></td>
+                        <td class="px-4 py-3 text-[#4a4026]" th:text="${'S/ ' + #numbers.formatDecimal(v.montoTotal, 1, 2)}"></td>
+                        <td class="px-4 py-3 text-[#4a4026]" th:text="${'S/ ' + #numbers.formatDecimal(v.montoCobrado, 1, 2)}"></td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex justify-end gap-2">
+                                <!-- Ver detalle -->
+                                <button th:if="${#authorization.expression('hasAuthority(''ventas.ver'')')}" type="button"
+                                    th:attr="onclick='ventaVista = {codigo: \"' + ${v.codigo} + '\", fecha: \"' + (#temporals.format(v.fechaVenta, 'dd/MM/yyyy')) + '\", tipo: \"' + (${v.tipoVenta == 'pedido'} ? 'Cierre pedido' : 'Venta stock') + '\", comprobante_tipo: \"' + (${v.comprobante != null} ? ${#strings.capitalize(v.comprobante.tipoComprobante)} : '-') + '\", comprobante_codigo: \"' + (${v.comprobante != null} ? ${v.comprobante.codigo} : '-') + '\", cliente: \"' + (${#strings.isEmpty(v.clienteNombre)} ? '-' : ${v.clienteNombre}) + '\", monto_total: \"S/ ' + ${#numbers.formatDecimal(v.montoTotal, 1, 2)} + '\", monto_cobrado: \"S/ ' + ${#numbers.formatDecimal(v.montoCobrado, 1, 2)} + '\", estado_pago: \"' + (${v.estadoPago != null} ? ${#strings.replace(v.estadoPago, '_', ' ')} : '-') + '\", observaciones: \"' + (${v.observaciones != null} ? ${v.observaciones} : '-') + '\" }; modalVenta = true'"
+                                    class="btn-icon-sm" style="background-color:#0891B2" title="Ver detalle">
+                                    <img th:src="@{/icons/ver-detalle.ico}" alt="Ver detalle" class="h-4 w-4 object-contain pointer-events-none" />
+                                </button>
+                                <!-- Imprimir comprobante -->
+                                <button th:if="${v.comprobante != null}" type="button"
+                                    th:attr="onclick='urlComprobante = \"' + @{/ventas/{id}/comprobante(id=${v.id})} + '\"; modalComprobante = true'"
+                                    class="btn-icon-sm" style="background-color:#64748B" title="Imprimir comprobante">
+                                    <img th:src="@{/icons/imprimir.ico}" alt="Imprimir" class="h-4 w-4 object-contain pointer-events-none" />
+                                </button>
+                                <!-- Emitir comprobante -->
+                                <form th:if="${v.comprobante == null}" method="POST" th:action="@{/ventas/{id}/emitir-comprobante(id=${v.id})}">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                    <button type="submit" class="btn-icon-sm" style="background-color:#64748B" title="Emitir comprobante">
+                                        <img th:src="@{/icons/imprimir.ico}" alt="Emitir" class="h-4 w-4 object-contain pointer-events-none" />
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(ventas)}">
+                        <td colspan="8" class="px-4 py-8 text-center text-[#777]">No hay ventas registradas.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal detalle venta -->
+    <template x-teleport="body">
+        <div x-show="modalVenta" style="display: none;">
+            <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="modalVenta = false"></div>
+            <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-[#efe7d2] px-5 py-3">
+                        <h3 class="text-base font-semibold text-[#2a2419]">Detalle rapido de venta</h3>
+                        <button type="button" @click="modalVenta = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                        </button>
+                    </div>
+                    <div class="grid gap-4 p-5 md:grid-cols-2" x-show="ventaVista">
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Codigo</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.codigo"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Fecha</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.fecha"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Tipo</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.tipo"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Comprobante</p><p class="mt-1 text-[#1f1f1f]"><span x-text="ventaVista?.comprobante_tipo"></span> - <span x-text="ventaVista?.comprobante_codigo"></span></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Cliente</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.cliente"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Monto total</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.monto_total"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Cobrado</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.monto_cobrado"></p></div>
+                        <div><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Estado pago</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.estado_pago"></p></div>
+                        <div class="md:col-span-2"><p class="text-xs uppercase tracking-[0.2em] text-[#8a6a2e]">Observaciones</p><p class="mt-1 text-[#1f1f1f]" x-text="ventaVista?.observaciones"></p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal comprobante PDF -->
+    <template x-teleport="body">
+        <div x-show="modalComprobante" style="display: none;">
+            <div x-transition.opacity class="fixed inset-0 z-[60] bg-black/60" @click="modalComprobante = false"></div>
+            <div x-transition class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                <div class="h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-[#efe7d2] px-5 py-3">
+                        <h3 class="text-base font-semibold text-[#2a2419]">Comprobante</h3>
+                        <button type="button" @click="modalComprobante = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                        </button>
+                    </div>
+                    <iframe :src="urlComprobante" class="h-[calc(92vh-56px)] w-full" title="Vista previa comprobante"></iframe>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal seleccionar caja -->
+    <template x-teleport="body">
+        <div x-show="selectorCajaAbierto" style="display: none;">
+            <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50" @click="selectorCajaAbierto = false"></div>
+            <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                        <h3 class="text-base font-semibold text-gray-800">Selecciona tu caja de trabajo</h3>
+                        <a th:href="@{/caja}" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Ir a abrir caja">
+                            <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                        </a>
+                    </div>
+                    <div class="p-5 space-y-3">
+                        <p class="text-sm text-gray-500">Elige la caja en la que deseas operar.</p>
+                        <div th:each="c : ${cajasAbiertas}">
+                            <a th:href="@{/ventas/seleccionar-caja/{id}(id=${c.id})}"
+                                class="flex items-center justify-between rounded-2xl border border-[#d1be8a] bg-[#fffdf7] p-4 shadow-sm transition hover:border-[#b8953a] hover:shadow-md">
+                                <div class="space-y-1">
+                                    <p class="text-sm font-semibold text-[#2a2419]" th:text="${c.nombre != null ? c.nombre : 'Caja #' + c.id}"></p>
+                                    <p class="text-xs text-gray-500" th:text="'Abierta: ' + ${#temporals.format(c.fechaApertura, 'dd/MM/yyyy HH:mm')}"></p>
+                                    <p th:if="${c.montoInicial != null and c.montoInicial > 0}" class="text-xs text-gray-500" th:text="'Monto inicial: S/ ' + ${#numbers.formatDecimal(c.montoInicial, 1, 2)}"></p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span>
+                                    <svg class="h-5 w-5 text-[#b8953a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal sin caja -->
+    <template x-teleport="body">
+        <div x-show="sinCajaAbierto" style="display: none;">
+            <div x-transition.opacity class="fixed inset-0 z-40 bg-black/50"></div>
+            <div x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white px-16 pt-12 pb-12 text-center shadow-xl">
+                    <div class="mx-auto mb-1 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                        <img th:src="@{/icons/Alerta-Rojo.png}" alt="Alerta" class="h-8 w-8 object-contain pointer-events-none" />
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">No hay ninguna caja abierta</h3>
+                    <p class="mt-2 text-sm text-gray-500">Ve al modulo de caja, abre una caja y vuelve para empezar a registrar ventas.</p>
+                    <a th:href="@{/caja}" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#111] py-3 px-12 text-sm font-semibold text-white hover:bg-[#262626]">
+                        <img th:src="@{/icons/Ventas-Blanco.png}" alt="" class="h-5 w-5 object-contain pointer-events-none" /> Ir a abrir caja
+                    </a>
+                </div>
+            </div>
+        </div>
+    </template>
+
+</div>
+</div>
+</body>
+</html>

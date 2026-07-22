@@ -1,17 +1,33 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout/main}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout/main}">
 <head><title>Caja - ARTE Y METAL</title></head>
 <body>
 <div layout:fragment="content">
-    <div x-data="{ modalAbrir:false, cerrarId:null, editarId:null, eliminarId:null, detalleId:null, filtrosAbiertos:false, filtrosCajaAbiertos:false, montoInicial:'', cajaSeleccionada:'' }" class="space-y-5">
 
-        <!-- Cajas disponibles -->
-        <section class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
+    <style>
+        .btn-icon:focus-visible, .btn-icon:focus, .btn-icon-sm:focus-visible, .btn-icon-sm:focus { outline: 0 none !important; }
+        .btn-icon:active, .btn-icon-sm:active { filter: brightness(0.85); }
+        .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; flex-shrink: 0; color: #fff; }
+        .btn-icon.is-active { filter: brightness(0.8); }
+        .btn-icon-sm { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.5rem; flex-shrink: 0; color: #fff; }
+    </style>
+
+    <div x-data="{
+        modalAbrir: false,
+        cerrarId: null,
+        cerrarData: null,
+        editarCaja: null,
+        eliminarCajaId: null,
+        detalleApertura: null,
+        filtrosAbiertos: false,
+        filtrosCajaAbiertos: false,
+        montoInicial: ''
+    }" class="space-y-5">
+
+        <!-- SECCION 1: TABLA DE CAJAS -->
+        <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
             <div class="flex items-center gap-2">
-                <form id="search-cajas-form" method="get" th:action="@{/caja}" class="flex min-w-0 flex-1">
+                <form id="search-cajas-form" method="GET" th:action="@{/caja}" class="flex min-w-0 flex-1">
                     <input type="hidden" name="q" th:value="${busqueda}" />
                     <input type="hidden" name="estado" th:value="${filtroEstado}" />
                     <input type="hidden" name="cq_estado" th:value="${filtroCajaEstado}" />
@@ -20,79 +36,413 @@
                 <button type="submit" form="search-cajas-form" class="btn-icon bg-blue-600 hover:bg-blue-700" title="Buscar">
                     <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none" />
                 </button>
-                <button type="button" @click="filtrosCajaAbiertos=!filtrosCajaAbiertos" class="btn-icon bg-sky-500 hover:bg-sky-600" :class="{ 'is-active': filtrosCajaAbiertos }" title="Filtrar">
+                <button type="button" @click="filtrosCajaAbiertos = !filtrosCajaAbiertos" class="btn-icon bg-sky-500 hover:bg-sky-600" title="Filtrar"
+                    :class="{ 'is-active': filtrosCajaAbiertos || (filtroCajaEstado != null && filtroCajaEstado !== '') }">
                     <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none" />
                 </button>
-                <a th:if="${!#strings.isEmpty(busquedaCaja) or !#strings.isEmpty(filtroCajaEstado)}" th:href="@{/caja(q=${busqueda},estado=${filtroEstado})}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
-                <button sec:authorize="hasAuthority('caja.gestionar')" type="button" @click="cajaSeleccionada=''; montoInicial=''; modalAbrir=true" class="btn-icon bg-[#09090f]" title="Abrir caja">
-                    <img th:src="@{/icons/nuevo.ico}" alt="Nuevo" class="h-5 w-5 object-contain pointer-events-none" />
-                </button>
+                <th:block th:if="${(busquedaCaja != null and busquedaCaja != '') or (filtroCajaEstado != null and filtroCajaEstado != '')}">
+                    <a th:href="@{/caja(q=${busqueda}, estado=${filtroEstado})}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+                </th:block>
+                <span sec:authorize="hasAuthority('caja.gestionar')">
+                    <button type="button" @click="modalAbrir = true" class="btn-icon" style="background-color:#09090f;color:white" title="Abrir caja">
+                        <img th:src="@{/icons/nuevo.ico}" alt="Nuevo" class="h-5 w-5 object-contain pointer-events-none" />
+                    </button>
+                </span>
             </div>
-            <form x-show="filtrosCajaAbiertos" x-cloak x-transition method="get" th:action="@{/caja}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
-                <input type="hidden" name="q" th:value="${busqueda}" /><input type="hidden" name="cq" th:value="${busquedaCaja}" /><input type="hidden" name="estado" th:value="${filtroEstado}" />
-                <div><label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Estado</label>
+
+            <form x-show="filtrosCajaAbiertos" x-transition method="GET" th:action="@{/caja}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
+                <input type="hidden" name="q" th:value="${busqueda}" />
+                <input type="hidden" name="cq" th:value="${busquedaCaja}" />
+                <input type="hidden" name="estado" th:value="${filtroEstado}" />
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Estado</label>
                     <select name="cq_estado" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm">
-                        <option value="">Todas</option><option value="abierta" th:selected="${filtroCajaEstado == 'abierta'}">Abierta</option><option value="cerrada" th:selected="${filtroCajaEstado == 'cerrada'}">Cerrada</option>
+                        <option value="">Todas</option>
+                        <option value="abierta" th:selected="${filtroCajaEstado == 'abierta'}">Abierta</option>
+                        <option value="cerrada" th:selected="${filtroCajaEstado == 'cerrada'}">Cerrada</option>
                     </select>
                 </div>
-                <button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">Filtrar</button>
+                <button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500">Filtrar</button>
             </form>
-        </section>
+        </div>
 
-        <section class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
-            <div class="overflow-x-auto"><table class="min-w-full text-sm">
-                <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]"><tr><th class="px-4 py-3 font-semibold">Caja</th><th class="px-4 py-3 font-semibold">Estado</th><th class="px-4 py-3 text-right font-semibold">Acciones</th></tr></thead>
-                <tbody>
-                <tr th:each="caja : ${cajas}" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td class="px-4 py-3"><span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-semibold text-[#6a5122]" th:text="${caja.nombre}"></span></td>
-                    <td class="px-4 py-3"><span th:if="${aperturaActiva[caja.id] != null}" class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span><span th:unless="${aperturaActiva[caja.id] != null}" class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cerrada</span></td>
-                    <td class="px-4 py-3"><div class="flex justify-end gap-2" sec:authorize="hasAuthority('caja.gestionar')">
-                        <button th:if="${aperturaActiva[caja.id] == null}" type="button" th:attr="data-id=${caja.id},data-monto=${ultimoMontoFinal[caja.id]}" @click="cajaSeleccionada=$el.dataset.id; montoInicial=$el.dataset.monto||''; modalAbrir=true" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700" title="Abrir caja"><img th:src="@{/icons/nuevo.ico}" alt="Abrir" class="h-4 w-4 object-contain pointer-events-none" /></button>
-                        <button th:if="${aperturaActiva[caja.id] != null}" type="button" th:attr="data-id=${aperturaActiva[caja.id].id}" @click="cerrarId=Number($el.dataset.id)" class="btn-icon-sm bg-rose-600 hover:bg-rose-700" title="Cerrar caja"><img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" /></button>
-                        <button type="button" th:attr="data-id=${caja.id}" @click="editarId=Number($el.dataset.id)" class="btn-icon-sm bg-amber-400 hover:bg-amber-500" title="Editar caja"><img th:src="@{/icons/editar.ico}" alt="Editar" class="h-4 w-4 object-contain pointer-events-none" /></button>
-                        <button th:if="${aperturaActiva[caja.id] == null}" type="button" th:attr="data-id=${caja.id}" @click="eliminarId=Number($el.dataset.id)" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Eliminar caja"><img th:src="@{/icons/eliminar.ico}" alt="Eliminar" class="h-4 w-4 object-contain pointer-events-none" /></button>
-                    </div></td>
-                </tr>
-                <tr th:if="${#lists.isEmpty(cajas)}"><td colspan="3" class="px-4 py-8 text-center text-gray-500">No hay cajas registradas.</td></tr>
-                </tbody>
-            </table></div>
-        </section>
+        <div class="rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Caja</th>
+                            <th class="px-4 py-3 font-semibold">Estado</th>
+                            <th class="px-4 py-3 text-right font-semibold">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="cajaItem : ${cajas}" class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                            <td class="px-4 py-3">
+                                <span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-semibold text-[#6a5122]" th:text="${cajaItem.nombre}"></span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <th:block th:if="${aperturaActiva.containsKey(cajaItem.id)}">
+                                    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span>
+                                </th:block>
+                                <th:block th:unless="${aperturaActiva.containsKey(cajaItem.id)}">
+                                    <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cerrada</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <span sec:authorize="hasAuthority('caja.gestionar')">
+                                        <th:block th:unless="${aperturaActiva.containsKey(cajaItem.id)}">
+                                            <button type="button" @click="montoInicial = '${ultimoMontoFinal.get(cajaItem.id) != null ? ultimoMontoFinal.get(cajaItem.id) : ''}'; modalAbrir = true; $nextTick(() => { $refs.selCajaId.value = '${cajaItem.id}' })" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700" title="Abrir caja">
+                                                <img th:src="@{/icons/nuevo.ico}" alt="Abrir" class="h-4 w-4 object-contain pointer-events-none" />
+                                            </button>
+                                        </th:block>
+                                        <th:block th:if="${aperturaActiva.containsKey(cajaItem.id)}">
+                                            <button type="button" @click="cerrarData = { id: '${aperturaActiva.get(cajaItem.id).id}', nombre: '${cajaItem.nombre}', usuario: '${aperturaActiva.get(cajaItem.id).usuario?.name}', apertura: '${aperturaActiva.get(cajaItem.id).fechaApertura}' }; cerrarId = '${aperturaActiva.get(cajaItem.id).id}'" class="btn-icon-sm bg-rose-600 hover:bg-rose-700" title="Cerrar caja">
+                                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                                            </button>
+                                        </th:block>
+                                        <button type="button" @click="editarCaja = { id: '${cajaItem.id}', nombre: '${cajaItem.nombre}', activa: ${cajaItem.activa} }" class="btn-icon-sm bg-amber-400 hover:bg-amber-500" title="Editar caja">
+                                            <img th:src="@{/icons/editar.ico}" alt="Editar" class="h-4 w-4 object-contain pointer-events-none" />
+                                        </button>
+                                        <th:block th:unless="${aperturaActiva.containsKey(cajaItem.id)}">
+                                            <button type="button" @click="eliminarCajaId = '${cajaItem.id}'" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Eliminar caja">
+                                                <img th:src="@{/icons/eliminar.ico}" alt="Eliminar" class="h-4 w-4 object-contain pointer-events-none" />
+                                            </button>
+                                        </th:block>
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${cajas.isEmpty()}">
+                            <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">No hay cajas registradas.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-        <!-- Historial -->
-        <section class="overflow-hidden rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
-            <div class="border-b border-[#efe7d2] px-5 py-3"><h2 class="w-full text-center text-sm font-semibold uppercase text-[#5a4a2a]">Historial de Cajas</h2></div>
-            <div class="px-4 py-3"><div class="flex items-center gap-2">
-                <form id="search-historial-form" method="get" th:action="@{/caja}" class="flex min-w-0 flex-1"><input type="hidden" name="estado" th:value="${filtroEstado}" /><input type="text" name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm text-gray-900" placeholder="Buscar por caja o usuario" /></form>
-                <button type="submit" form="search-historial-form" class="btn-icon bg-blue-600 hover:bg-blue-700" title="Buscar"><img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none" /></button>
-                <button type="button" @click="filtrosAbiertos=!filtrosAbiertos" class="btn-icon bg-sky-500 hover:bg-sky-600" :class="{ 'is-active': filtrosAbiertos }" title="Filtrar"><img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none" /></button>
-                <a th:if="${!#strings.isEmpty(busqueda) or !#strings.isEmpty(filtroEstado)}" th:href="@{/caja}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+        <!-- SECCION 2: HISTORIAL DE CAJAS -->
+        <div class="rounded-2xl border border-[#e5dec8] bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-[#efe7d2] px-5 py-3">
+                <h2 class="text-sm font-semibold text-[#5a4a2a] text-center w-full uppercase">Historial de Cajas</h2>
             </div>
-            <form x-show="filtrosAbiertos" x-cloak x-transition method="get" th:action="@{/caja}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4"><input type="hidden" name="q" th:value="${busqueda}" /><div><label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Estado</label><select name="estado" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700"><option value="">Todos</option><option value="abierta" th:selected="${filtroEstado == 'abierta'}">Abierta</option><option value="cerrada" th:selected="${filtroEstado == 'cerrada'}">Cerrada</option></select></div><button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-600">Filtrar</button></form>
+
+            <div class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                    <form id="search-historial-form" method="GET" th:action="@{/caja}" class="flex min-w-0 flex-1">
+                        <input type="hidden" name="estado" th:value="${filtroEstado}" />
+                        <input type="text" name="q" th:value="${busqueda}" class="min-w-0 flex-1 rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-2.5 text-sm text-gray-900" placeholder="Buscar por caja o usuario" />
+                    </form>
+                    <button type="submit" form="search-historial-form" class="btn-icon bg-blue-600 hover:bg-blue-700" title="Buscar">
+                        <img th:src="@{/icons/buscar.ico}" alt="Buscar" class="h-5 w-5 object-contain pointer-events-none" />
+                    </button>
+                    <button type="button" @click="filtrosAbiertos = !filtrosAbiertos" class="btn-icon bg-sky-500 hover:bg-sky-600" title="Filtrar"
+                        :class="{ 'is-active': filtrosAbiertos || (filtroEstado != null && filtroEstado !== '') }">
+                        <img th:src="@{/icons/filtros.ico}" alt="Filtrar" class="h-5 w-5 object-contain pointer-events-none" />
+                    </button>
+                    <th:block th:if="${(busqueda != null and busqueda != '') or (filtroEstado != null and filtroEstado != '')}">
+                        <a th:href="@{/caja}" class="shrink-0 rounded-xl border border-[#d1be8a] px-3 py-2.5 text-sm text-[#5a4314] hover:bg-[#fff5dd]">Limpiar</a>
+                    </th:block>
+                </div>
+
+                <form x-show="filtrosAbiertos" x-transition method="GET" th:action="@{/caja}" class="mt-4 flex flex-wrap items-end gap-4 border-t border-[#efe7d2] pt-4">
+                    <input type="hidden" name="q" th:value="${busqueda}" />
+                    <div>
+                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-600">Estado</label>
+                        <select name="estado" class="rounded-xl border border-[#d1be8a] bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm">
+                            <option value="">Todos</option>
+                            <option value="abierta" th:selected="${filtroEstado == 'abierta'}">Abierta</option>
+                            <option value="cerrada" th:selected="${filtroEstado == 'cerrada'}">Cerrada</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-500">Filtrar</button>
+                </form>
             </div>
-            <div class="overflow-x-auto"><table class="min-w-full text-sm">
-                <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]"><tr><th class="px-4 py-3">Caja</th><th class="px-4 py-3">Usuario</th><th class="px-4 py-3">Apertura</th><th class="px-4 py-3">Inicial</th><th class="px-4 py-3">Cierre</th><th class="px-4 py-3">Efectivo Final</th><th class="px-4 py-3">N° Ventas</th><th class="px-4 py-3">Efectivo</th><th class="px-4 py-3">Digital</th><th class="px-4 py-3">Vuelto</th><th class="px-4 py-3">Total final</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Acciones</th></tr></thead>
-                <tbody><tr th:each="ap : ${aperturas}" class="border-b border-gray-100 last:border-0 hover:bg-gray-50" th:with="r=${resumenAperturas[ap.id]}">
-                    <td class="px-4 py-3"><span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-semibold text-[#6a5122]" th:text="${ap.caja != null ? ap.caja.nombre : ap.nombre}"></span></td><td class="px-4 py-3" th:text="${ap.usuario != null ? ap.usuario.name : '-'}"></td><td class="px-4 py-3" th:text="${#temporals.format(ap.fechaApertura,'dd/MM/yyyy HH:mm')}"></td><td class="px-4 py-3" th:text="|S/ ${#numbers.formatDecimal(ap.montoInicial,1,2)}|"></td><td class="px-4 py-3" th:text="${ap.fechaCierre != null ? #temporals.format(ap.fechaCierre,'dd/MM/yyyy HH:mm') : '-'}"></td>
-                    <td class="px-4 py-3 font-semibold" th:text="|S/ ${#numbers.formatDecimal(r['efectivoFinal'],1,2)}|"></td><td class="px-4 py-3" th:text="${r['cantidadVentas']}"></td><td class="px-4 py-3 font-medium text-emerald-700" th:text="|S/ ${#numbers.formatDecimal(r['efectivo'],1,2)}|"></td><td class="px-4 py-3 font-medium text-sky-700" th:text="|S/ ${#numbers.formatDecimal(r['digital'],1,2)}|"></td><td class="px-4 py-3 font-medium text-red-600" th:text="|-S/ ${#numbers.formatDecimal(r['vuelto'],1,2)}|"></td><td class="px-4 py-3 font-semibold" th:text="|S/ ${#numbers.formatDecimal(r['totalFinal'],1,2)}|"></td><td class="px-4 py-3"><span th:if="${ap.estado == 'abierta'}" class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span><span th:unless="${ap.estado == 'abierta'}" class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cerrada</span></td><td class="px-4 py-3 text-right"><button type="button" th:attr="data-id=${ap.id}" @click="detalleId=Number($el.dataset.id)" class="btn-icon-sm bg-[#0891B2]" title="Ver detalle"><img th:src="@{/icons/ver-detalle.ico}" alt="Ver" class="h-4 w-4 object-contain pointer-events-none" /></button></td>
-                </tr><tr th:if="${aperturas.empty}"><td colspan="13" class="px-4 py-8 text-center text-gray-500">No hay registros en el historial.</td></tr></tbody>
-            </table></div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-[#faf8f2] text-left text-[#5a4a2a]">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Caja</th>
+                            <th class="px-4 py-3 font-semibold">Usuario</th>
+                            <th class="px-4 py-3 font-semibold">Apertura</th>
+                            <th class="px-4 py-3 font-semibold">Inicial</th>
+                            <th class="px-4 py-3 font-semibold">Cierre</th>
+                            <th class="px-4 py-3 font-semibold">Efectivo Final</th>
+                            <th class="px-4 py-3 font-semibold">N° Ventas</th>
+                            <th class="px-4 py-3 font-semibold">Efectivo</th>
+                            <th class="px-4 py-3 font-semibold">Digital</th>
+                            <th class="px-4 py-3 font-semibold">Vuelto</th>
+                            <th class="px-4 py-3 font-semibold">Total final</th>
+                            <th class="px-4 py-3 font-semibold">Estado</th>
+                            <th class="px-4 py-3 text-right font-semibold">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="apertura : ${aperturas}" th:with="res=${resumenAperturas.get(apertura.id)}"
+                            class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                            <td class="px-4 py-3"><span class="rounded-lg bg-[#f4ebd4] px-2.5 py-1 text-xs font-semibold text-[#6a5122]" th:text="${apertura.caja?.nombre ?: apertura.nombre ?: ('Caja #' + apertura.id)}"></span></td>
+                            <td class="px-4 py-3 text-gray-900" th:text="${apertura.usuario?.name ?: '-'}"></td>
+                            <td class="px-4 py-3 text-gray-700" th:text="${#temporals.format(apertura.fechaApertura, 'dd/MM/yyyy HH:mm')}"></td>
+                            <td class="px-4 py-3 text-gray-900" th:text="'S/ ' + ${#numbers.formatDecimal(apertura.montoInicial, 1, 2)}"></td>
+                            <td class="px-4 py-3 text-gray-700" th:text="${apertura.fechaCierre != null ? #temporals.format(apertura.fechaCierre, 'dd/MM/yyyy HH:mm') : '-'}"></td>
+                            <td class="px-4 py-3 text-gray-900 font-semibold" th:text="'S/ ' + ${#numbers.formatDecimal(res.efectivoFinal, 1, 2)}"></td>
+                            <td class="px-4 py-3" th:text="${res.cantidadVentas}"></td>
+                            <td class="px-4 py-3 text-emerald-700 font-medium" th:text="'S/ ' + ${#numbers.formatDecimal(res.efectivo, 1, 2)}"></td>
+                            <td class="px-4 py-3 text-sky-700 font-medium" th:text="'S/ ' + ${#numbers.formatDecimal(res.digital, 1, 2)}"></td>
+                            <td class="px-4 py-3 text-red-600 font-medium" th:text="'-S/ ' + ${#numbers.formatDecimal(res.vuelto, 1, 2)}"></td>
+                            <td class="px-4 py-3 text-gray-900 font-semibold" th:text="'S/ ' + ${#numbers.formatDecimal(res.totalFinal, 1, 2)}"></td>
+                            <td class="px-4 py-3">
+                                <th:block th:if="${apertura.estado == 'abierta'}">
+                                    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span>
+                                </th:block>
+                                <th:block th:unless="${apertura.estado == 'abierta'}">
+                                    <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cerrada</span>
+                                </th:block>
+                            </td>
+                            <td class="px-4 py-3 text-right">
+                                <button type="button"
+                                    th:attr="onclick='detalleApertura = {nombre: \'' + (${apertura.caja?.nombre ?: apertura.nombre ?: 'Caja #' + apertura.id}).replace(/'/g, "\\'") + '\', usuario: \'' + (${apertura.usuario?.name ?: '-'}).replace(/'/g, "\\'") + '\', apertura: \'' + ${#temporals.format(apertura.fechaApertura, 'dd/MM/yyyy HH:mm')} + '\', cierre: \'' + (${apertura.fechaCierre != null ? #temporals.format(apertura.fechaCierre, 'dd/MM/yyyy HH:mm') : '—'}) + '\', inicial: \'S/ ' + ${#numbers.formatDecimal(apertura.montoInicial, 1, 2)} + '\', efectivo: \'S/ ' + ${#numbers.formatDecimal(res?.efectivo ?: 0, 1, 2)} + '\', digital: \'S/ ' + ${#numbers.formatDecimal(res?.digital ?: 0, 1, 2)} + '\', vuelto: \'-S/ ' + ${#numbers.formatDecimal(res?.vuelto ?: 0, 1, 2)} + '\', efectivo_final: \'S/ ' + ${#numbers.formatDecimal(res?.efectivoFinal ?: 0, 1, 2)} + '\', total_final: \'S/ ' + ${#numbers.formatDecimal(res?.totalFinal ?: 0, 1, 2)} + '\', ventas_count: ' + (${res?.cantidadVentas ?: 0}) + ', estado: \'' + ${apertura.estado} + '\', observaciones: \'' + (${apertura.observaciones ?: ''}).replace(/'/g, "\\'") + '\'}; detalleApertura != null'"
+                                    class="btn-icon-sm" style="background-color:#0891B2" title="Ver detalle">
+                                    <img th:src="@{/icons/ver-detalle.ico}" alt="Ver" class="h-4 w-4 object-contain pointer-events-none" />
+                                </button>
+                            </td>
+                        </tr>
+                        <tr th:if="${aperturas.isEmpty()}">
+                            <td colspan="13" class="px-4 py-8 text-center text-sm text-gray-500">No hay registros en el historial.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div class="border-t border-[#efe7d2] px-4 py-3" th:if="${aperturas.totalPages > 1}" th:replace="~{fragments/pagination :: pagination(${aperturas})}"></div>
-        </section>
+        </div>
 
-        <!-- Modal abrir -->
-        <template x-teleport="body"><div x-show="modalAbrir" x-cloak><div class="fixed inset-0 z-40 bg-black/50" @click="modalAbrir=false"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop><div class="flex items-center justify-between border-b px-5 py-3"><h3 class="font-semibold">Abrir caja</h3><button type="button" @click="modalAbrir=false" class="btn-icon-sm bg-red-600" title="Cerrar"><img th:src="@{/icons/cerrar.ico}" class="h-4 w-4 pointer-events-none" /></button></div><form method="post" th:action="@{/caja/abrir}" class="space-y-4 p-5"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" /><div><label class="mb-2 block text-sm font-medium">Seleccionar caja</label><select name="caja_id" x-model="cajaSeleccionada" @change="montoInicial=$el.options[$el.selectedIndex]?.dataset.monto||''" required class="block w-full rounded-xl border border-gray-300 px-4 py-3"><option value="">Seleccione una caja</option><option th:each="c : ${cajas}" th:if="${aperturaActiva[c.id] == null}" th:value="${c.id}" th:attr="data-monto=${ultimoMontoFinal[c.id]}" th:text="${c.nombre}"></option></select></div><div><label class="mb-2 block text-sm font-medium">Monto inicial</label><input name="monto_inicial" type="number" step="0.01" min="0" required x-model="montoInicial" class="block w-full rounded-xl border border-gray-300 px-4 py-3" placeholder="0.00" /></div><div><label class="mb-2 block text-sm font-medium">Observaciones</label><textarea name="observaciones" rows="2" class="block w-full rounded-xl border border-gray-300 px-4 py-3" placeholder="Opcional"></textarea></div><button class="w-full rounded-xl bg-[#111] px-4 py-3 text-sm font-semibold text-white">Abrir caja</button></form></div></div></div></template>
+        <!-- Modal abrir caja -->
+        <div x-show="modalAbrir" x-transition.opacity class="fixed inset-0 z-40 bg-black/50" style="display: none;" @click="modalAbrir = false"></div>
+        <div x-show="modalAbrir" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                    <h3 class="text-base font-semibold text-gray-800">Abrir caja</h3>
+                    <button type="button" @click="modalAbrir = false" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                    </button>
+                </div>
+                <form method="POST" th:action="@{/caja/abrir}" class="p-5 space-y-4">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <div>
+                        <label for="caja_id" class="mb-2 block text-sm font-medium text-gray-700">Seleccionar caja</label>
+                        <select id="caja_id" name="caja_id" x-ref="selCajaId" required
+                            @change="montoInicial = $el.options[$el.selectedIndex]?.dataset.monto || ''"
+                            class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900">
+                            <option value="">Seleccione una caja</option>
+                            <th:block th:each="cajaItem : ${cajas}">
+                                <th:block th:unless="${aperturaActiva.containsKey(cajaItem.id)}">
+                                    <option th:value="${cajaItem.id}" th:attr="data-monto=${ultimoMontoFinal.get(cajaItem.id) != null ? ultimoMontoFinal.get(cajaItem.id) : ''}" th:text="${cajaItem.nombre}"></option>
+                                </th:block>
+                            </th:block>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="monto_inicial" class="mb-2 block text-sm font-medium text-gray-700">Monto inicial</label>
+                        <input id="monto_inicial" name="monto_inicial" type="number" step="0.01" min="0" required x-model="montoInicial" class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900" placeholder="0.00" />
+                    </div>
+                    <div>
+                        <label for="obs_abrir" class="mb-2 block text-sm font-medium text-gray-700">Observaciones</label>
+                        <textarea id="obs_abrir" name="observaciones" rows="2" class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900" placeholder="Opcional"></textarea>
+                    </div>
+                    <button type="submit" class="w-full rounded-xl bg-[#111] px-4 py-3 text-sm font-semibold text-white hover:bg-[#262626]">Abrir caja</button>
+                </form>
+            </div>
+        </div>
 
-        <!-- Modales por caja -->
-        <th:block th:each="caja : ${cajas}">
-            <template x-teleport="body"><div th:attr="data-id=${caja.id}" x-show="editarId === Number($el.dataset.id)" x-cloak><div class="fixed inset-0 z-40 bg-black/50" @click="editarId=null"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @click.stop><div class="flex items-center justify-between border-b px-5 py-3"><h3 class="font-semibold">Editar caja</h3><button @click="editarId=null" class="btn-icon-sm bg-red-600"><img th:src="@{/icons/cerrar.ico}" class="h-4 w-4" /></button></div><form method="post" th:action="@{/caja/{id}/actualizar(id=${caja.id})}" class="space-y-4 p-5"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" /><div><label class="mb-2 block text-sm font-medium">Nombre</label><input name="nombre" th:value="${caja.nombre}" required class="block w-full rounded-xl border border-gray-300 px-4 py-3" /></div><label class="flex items-center gap-2 text-sm"><input type="checkbox" name="activa" value="true" th:checked="${caja.activa}" class="rounded text-emerald-600" /> Activa</label><button class="w-full rounded-xl bg-[#111] px-4 py-3 text-sm font-semibold text-white">Guardar cambios</button></form></div></div></div></template>
-            <template x-teleport="body"><div th:attr="data-id=${caja.id}" x-show="eliminarId === Number($el.dataset.id)" x-cloak><div class="fixed inset-0 z-40 bg-black/50" @click="eliminarId=null"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-md rounded-2xl bg-white p-5 text-center shadow-xl" @click.stop><img th:src="@{/icons/Alerta-Rojo.png}" class="mx-auto h-14 w-14" /><p class="my-4 text-sm">¿Estás seguro de eliminar esta caja?</p><div class="flex gap-3"><button @click="eliminarId=null" class="flex-1 rounded-xl border px-4 py-3">Cancelar</button><form method="post" th:action="@{/caja/{id}/eliminar(id=${caja.id})}" class="flex-1"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" /><button class="w-full rounded-xl bg-red-600 px-4 py-3 text-white">Eliminar</button></form></div></div></div></div></template>
+        <!-- Modal editar caja -->
+        <div x-show="editarCaja" x-transition.opacity class="fixed inset-0 z-40 bg-black/50" style="display: none;" @click="editarCaja = null"></div>
+        <div x-show="editarCaja" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                    <h3 class="text-base font-semibold text-gray-800">Editar caja</h3>
+                    <button type="button" @click="editarCaja = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                    </button>
+                </div>
+                <form method="POST" x-bind:action="'/caja/' + editarCaja?.id + '/actualizar'" class="p-5 space-y-4">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <input type="hidden" name="_method" value="POST" />
+                    <div>
+                        <label for="editar_nombre" class="mb-2 block text-sm font-medium text-gray-700">Nombre</label>
+                        <input id="editar_nombre" name="nombre" type="text" required :value="editarCaja?.nombre" class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900" />
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <label class="mb-0 text-sm font-medium text-gray-700">Activa</label>
+                        <button type="button" @click="editarCaja.activa = !editarCaja.activa" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="editarCaja?.activa ? 'bg-emerald-500' : 'bg-gray-300'">
+                            <span class="inline-block h-4 w-4 rounded-full bg-white transition-transform" :class="editarCaja?.activa ? 'translate-x-6' : 'translate-x-1'"></span>
+                        </button>
+                        <input type="hidden" name="activa" :value="editarCaja?.activa ? 'true' : 'false'" />
+                    </div>
+                    <button type="submit" class="w-full rounded-xl bg-[#111] px-4 py-3 text-sm font-semibold text-white hover:bg-[#262626]">Guardar cambios</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal confirmar eliminar caja -->
+        <div x-show="eliminarCajaId" x-transition.opacity class="fixed inset-0 z-40 bg-black/50" style="display: none;" @click="eliminarCajaId = null"></div>
+        <div x-show="eliminarCajaId" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                    <h3 class="text-base font-semibold text-gray-800">Eliminar caja</h3>
+                    <button type="button" @click="eliminarCajaId = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                    </button>
+                </div>
+                <div class="p-5 space-y-4 text-center">
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+                        <img th:src="@{/icons/Alerta-Rojo.png}" alt="Alerta" class="h-7 w-7 object-contain pointer-events-none" />
+                    </div>
+                    <p class="text-sm text-gray-700">¿Estás seguro de eliminar esta caja? Esta acción no se puede deshacer.</p>
+                    <div class="flex gap-3">
+                        <button type="button" @click="eliminarCajaId = null" class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>
+                        <form method="POST" x-bind:action="'/caja/' + eliminarCajaId + '/eliminar'" class="flex-1">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                            <button type="submit" class="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700">Eliminar</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal cerrar caja -->
+        <th:block th:each="apertura : ${aperturas}">
+            <th:block th:if="${apertura.estado == 'abierta'}">
+                <div x-show="cerrarId == '[[${apertura.id}]]'" x-transition.opacity class="fixed inset-0 z-40 bg-black/50" style="display: none;" @click="cerrarId = null"></div>
+                <div x-show="cerrarId == '[[${apertura.id}]]'" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+                    <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                        <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                            <h3 class="text-base font-semibold text-gray-800">Cerrar caja</h3>
+                            <button type="button" @click="cerrarId = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                                <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                            </button>
+                        </div>
+                        <th:block th:with="res=${resumenAperturas.get(apertura.id)}, totalVentasCalc=${res.efectivo.add(res.digital).subtract(res.vuelto)}, esperado=${apertura.montoInicial.add(res.efectivo.add(res.digital).subtract(res.vuelto))}">
+                        <form method="POST" th:action="@{/caja/{id}/cerrar(id=${apertura.id})}" class="p-5 space-y-4">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                            <div>
+                                <p class="text-sm text-gray-600">Caja: <strong th:text="${apertura.caja?.nombre ?: apertura.nombre ?: ('Caja #' + apertura.id)}"></strong></p>
+                                <p class="mt-1 text-sm text-gray-600">Abrió: <strong th:text="${apertura.usuario?.name ?: '-'}"></strong></p>
+                                <p class="mt-1 text-sm text-gray-600">Apertura: <strong th:text="${#temporals.format(apertura.fechaApertura, 'dd/MM/yyyy HH:mm')}"></strong></p>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+                                <div class="flex justify-between text-sm text-gray-600">
+                                    <span>Monto inicial</span>
+                                    <span class="font-medium text-gray-900" th:text="'S/ ' + ${#numbers.formatDecimal(apertura.montoInicial, 1, 2)}"></span>
+                                </div>
+                                <div class="flex justify-between text-sm text-gray-600">
+                                    <span>+ Efectivo</span>
+                                    <span class="font-medium text-emerald-700" th:text="'S/ ' + ${#numbers.formatDecimal(res.efectivo, 1, 2)}"></span>
+                                </div>
+                                <div class="flex justify-between text-sm text-gray-600">
+                                    <span>+ Digital</span>
+                                    <span class="font-medium text-sky-700" th:text="'S/ ' + ${#numbers.formatDecimal(res.digital, 1, 2)}"></span>
+                                </div>
+                                <div class="flex justify-between text-sm text-gray-600">
+                                    <span>- Vuelto</span>
+                                    <span class="font-medium text-red-600" th:text="'-S/ ' + ${#numbers.formatDecimal(res.vuelto, 1, 2)}"></span>
+                                </div>
+                                <hr class="border-gray-300">
+                                <div class="flex justify-between text-sm font-semibold text-gray-900">
+                                    <span>Monto esperado</span>
+                                    <span th:text="'S/ ' + ${#numbers.formatDecimal(esperado, 1, 2)}"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700">Monto final en caja</label>
+                                <input name="monto_final" type="number" step="0.01" min="0" required th:value="${#numbers.formatDecimal(esperado, 1, 'POINT', '')}" class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900" />
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700">Observaciones</label>
+                                <textarea name="observaciones" rows="2" class="block w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900" placeholder="Opcional"></textarea>
+                            </div>
+                            <button type="submit" class="w-full rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700">Cerrar caja</button>
+                        </form>
+                        </th:block>
+                    </div>
+                </div>
+            </th:block>
         </th:block>
 
-        <!-- Cierre y detalle por apertura -->
-        <th:block th:each="ap : ${aperturas}" th:with="r=${resumenAperturas[ap.id]}, esperado=${ap.montoInicial.add(r['efectivo']).add(r['digital']).subtract(r['vuelto'])}">
-            <template th:if="${ap.estado == 'abierta'}" x-teleport="body"><div th:attr="data-id=${ap.id}" x-show="cerrarId === Number($el.dataset.id)" x-cloak><div class="fixed inset-0 z-40 bg-black/50" @click="cerrarId=null"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @click.stop><div class="flex items-center justify-between border-b px-5 py-3"><h3 class="font-semibold">Cerrar caja</h3><button @click="cerrarId=null" class="btn-icon-sm bg-red-600"><img th:src="@{/icons/cerrar.ico}" class="h-4 w-4" /></button></div><form method="post" th:action="@{/caja/{id}/cerrar(id=${ap.id})}" class="space-y-4 p-5"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" /><p class="text-sm">Caja: <strong th:text="${ap.nombre}"></strong></p><div class="space-y-2 rounded-xl border bg-gray-50 p-4 text-sm"><div class="flex justify-between"><span>Monto inicial</span><span th:text="|S/ ${#numbers.formatDecimal(ap.montoInicial,1,2)}|"></span></div><div class="flex justify-between text-emerald-700"><span>+ Efectivo</span><span th:text="|S/ ${#numbers.formatDecimal(r['efectivo'],1,2)}|"></span></div><div class="flex justify-between text-sky-700"><span>+ Digital</span><span th:text="|S/ ${#numbers.formatDecimal(r['digital'],1,2)}|"></span></div><div class="flex justify-between text-red-600"><span>- Vuelto</span><span th:text="|-S/ ${#numbers.formatDecimal(r['vuelto'],1,2)}|"></span></div><hr/><div class="flex justify-between font-semibold"><span>Monto esperado</span><span th:text="|S/ ${#numbers.formatDecimal(esperado,1,2)}|"></span></div></div><div><label class="mb-2 block text-sm font-medium">Monto final en caja</label><input name="monto_final" type="number" step="0.01" min="0" required th:value="${esperado}" class="block w-full rounded-xl border px-4 py-3" /></div><textarea name="observaciones" rows="2" class="block w-full rounded-xl border px-4 py-3" placeholder="Observaciones (opcional)"></textarea><button class="w-full rounded-xl bg-rose-600 px-4 py-3 font-semibold text-white">Cerrar caja</button></form></div></div></div></template>
-            <template x-teleport="body"><div th:attr="data-id=${ap.id}" x-show="detalleId === Number($el.dataset.id)" x-cloak><div class="fixed inset-0 z-40 bg-black/50" @click="detalleId=null"></div><div class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="w-full max-w-lg rounded-2xl bg-white shadow-xl" @click.stop><div class="flex items-center justify-between border-b px-5 py-3"><h3 class="font-semibold">Detalle de apertura</h3><button @click="detalleId=null" class="btn-icon-sm bg-red-600"><img th:src="@{/icons/cerrar.ico}" class="h-4 w-4" /></button></div><div class="grid gap-4 p-5 md:grid-cols-2"><div><small class="uppercase text-gray-500">Caja</small><p th:text="${ap.nombre}"></p></div><div><small class="uppercase text-gray-500">Usuario</small><p th:text="${ap.usuario != null ? ap.usuario.name : '-'}"></p></div><div><small class="uppercase text-gray-500">Apertura</small><p th:text="${#temporals.format(ap.fechaApertura,'dd/MM/yyyy HH:mm')}"></p></div><div><small class="uppercase text-gray-500">Cierre</small><p th:text="${ap.fechaCierre != null ? #temporals.format(ap.fechaCierre,'dd/MM/yyyy HH:mm') : '-'}"></p></div><div><small class="uppercase text-gray-500">Monto inicial</small><p th:text="|S/ ${#numbers.formatDecimal(ap.montoInicial,1,2)}|"></p></div><div><small class="uppercase text-gray-500">Efectivo final</small><p class="font-semibold" th:text="|S/ ${#numbers.formatDecimal(r['efectivoFinal'],1,2)}|"></p></div><div><small class="uppercase text-gray-500">N° Ventas</small><p th:text="${r['cantidadVentas']}"></p></div><div><small class="uppercase text-gray-500">Total final</small><p class="font-semibold" th:text="|S/ ${#numbers.formatDecimal(r['totalFinal'],1,2)}|"></p></div><div class="md:col-span-2" th:if="${ap.observaciones != null}"><small class="uppercase text-gray-500">Observaciones</small><p th:text="${ap.observaciones}"></p></div></div></div></div></div></template>
-        </th:block>
+        <!-- Modal ver detalle historial -->
+        <div x-show="detalleApertura" x-transition.opacity class="fixed inset-0 z-40 bg-black/50" style="display: none;" @click="detalleApertura = null"></div>
+        <div x-show="detalleApertura" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-xl" @click.stop>
+                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                    <h3 class="text-base font-semibold text-gray-800">Detalle de apertura</h3>
+                    <button type="button" @click="detalleApertura = null" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Cerrar">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none" />
+                    </button>
+                </div>
+                <div class="grid gap-4 p-5 md:grid-cols-2">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Caja</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.nombre"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Usuario</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.usuario"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Apertura</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.apertura"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Cierre</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.cierre"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Monto inicial</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.inicial"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Efectivo Final</p>
+                        <p class="mt-1 text-gray-900 font-semibold" x-text="detalleApertura?.efectivo_final"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">N° Ventas</p>
+                        <p class="mt-1 text-gray-900" x-text="detalleApertura?.ventas_count"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Efectivo</p>
+                        <p class="mt-1 text-emerald-700 font-medium" x-text="detalleApertura?.efectivo"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Digital</p>
+                        <p class="mt-1 text-sky-700 font-medium" x-text="detalleApertura?.digital"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Vuelto</p>
+                        <p class="mt-1 text-red-600 font-medium" x-text="detalleApertura?.vuelto"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Total final</p>
+                        <p class="mt-1 text-gray-900 font-semibold" x-text="detalleApertura?.total_final"></p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Estado</p>
+                        <p class="mt-1">
+                            <template x-if="detalleApertura?.estado === 'abierta'">
+                                <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Abierta</span>
+                            </template>
+                            <template x-if="detalleApertura?.estado !== 'abierta'">
+                                <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Cerrada</span>
+                            </template>
+                        </p>
+                    </div>
+                    <div class="md:col-span-2" x-show="detalleApertura?.observaciones">
+                        <p class="text-xs uppercase tracking-[0.2em] text-gray-500">Observaciones</p>
+                        <p class="mt-1 text-gray-700" x-text="detalleApertura?.observaciones"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 </body>
