@@ -13,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.*;
 
 @RestController
-@RequestMapping("/cliente-consulta")
+@RequestMapping("/clientes")
 public class ClienteConsultaController {
 
     @Autowired private ClienteRepository clienteRepository;
@@ -33,7 +33,7 @@ public class ClienteConsultaController {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @PostMapping("/consultar-por-documento")
+    @GetMapping("/consulta-documento")
     public Map<String, Object> consultarPorDocumento(@RequestParam String numero) {
         String limpio = numero.replaceAll("\\D+", "").trim();
 

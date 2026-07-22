@@ -25,7 +25,7 @@ public class SunatController {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @PostMapping("/consultar-ruc")
+    @GetMapping("/ruc")
     public Map<String, Object> consultarRuc(@RequestParam String numero) {
         Map<String, Object> resp = new LinkedHashMap<>();
 
