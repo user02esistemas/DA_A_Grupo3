@@ -1,3 +1,9 @@
+<div th:if="${errores != null and !errores.isEmpty()}" class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
+    <p class="text-sm font-semibold text-red-800">Se encontraron los siguientes errores:</p>
+    <ul class="mt-1 list-disc list-inside text-sm text-red-700">
+        <li th:each="error : ${errores}" th:text="${error}">Error</li>
+    </ul>
+</div>
 <div class="grid gap-4 md:grid-cols-2">
     <div>
         <label for="name" class="mb-2 block text-sm font-medium text-[#7a6030]">Nombre</label>

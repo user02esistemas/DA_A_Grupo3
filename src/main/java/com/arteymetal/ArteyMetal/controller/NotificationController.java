@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.arteymetal.ArteyMetal.entity.Notification;
@@ -32,12 +34,29 @@ public class NotificationController {
     }
 
     @GetMapping
-    public String index(@AuthenticationPrincipal Usuario usuario, Model model) {
-        List<Notification> notificaciones = notificationRepository.findByUserIdOrderByCreatedAtDesc(usuario.getId());
+    public String index(@AuthenticationPrincipal Usuario usuario,
+                        @RequestParam(defaultValue = "0") int page,
+                        Model model) {
+        Pageable pageable = PageRequest.of(page, 15);
+        Page<Notification> notificaciones = notificationRepository.findByUserIdOrderByCreatedAtDesc(usuario.getId(), pageable);
         long noLeidas = notificationRepository.countByUserIdAndIsReadFalse(usuario.getId());
 
         model.addAttribute("notificaciones", notificaciones);
         model.addAttribute("noLeidas", noLeidas);
+
+        StringBuilder paginationHtml = new StringBuilder();
+        if (notificaciones.getTotalPages() > 1) {
+            paginationHtml.append("<nav class=\"flex items-center justify-center gap-1\">");
+            for (int i = 0; i < notificaciones.getTotalPages(); i++) {
+                boolean active = (i == page);
+                String cls = active
+                    ? "px-3 py-1.5 rounded-lg text-sm font-medium bg-[#b9943d] text-white"
+                    : "px-3 py-1.5 rounded-lg text-sm font-medium text-[#5a4314] hover:bg-[#fff5dd] border border-[#d1be8a]";
+                paginationHtml.append("<a href=\"/notificaciones?page=").append(i).append("\" class=\"").append(cls).append("\">").append(i + 1).append("</a>");
+            }
+            paginationHtml.append("</nav>");
+        }
+        model.addAttribute("paginationHtml", paginationHtml.toString());
 
         return "notifications/index";
     }

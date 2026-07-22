@@ -147,9 +147,6 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr th:unless="${#lists.isEmpty(clientes)}" style="display: none;">
-                            <td colspan="5" class="px-4 py-8 text-center text-[#777]">No hay clientes registrados.</td>
-                        </tr>
                         <tr th:if="${#lists.isEmpty(clientes)}">
                             <td colspan="5" class="px-4 py-8 text-center text-[#777]">No hay clientes registrados.</td>
                         </tr>

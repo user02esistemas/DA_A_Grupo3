@@ -70,12 +70,23 @@ public class PedidoController {
             pedidos = pedidoRepository.searchWithFilters(q, estado, estado_personalizacion, pageable);
         }
 
+        StringBuilder pvdm = new StringBuilder("{");
+        boolean firstPedido = true;
+        for (Pedido p : pedidos) {
+            if (!firstPedido) pvdm.append(",");
+            firstPedido = false;
+            pvdm.append("\"").append(p.getId()).append("\":").append(buildPedidoVistaJson(p));
+        }
+        pvdm.append("}");
+
         model.addAttribute("pedidos", pedidos);
         model.addAttribute("busqueda", q);
         model.addAttribute("filtroEstado", estado);
         model.addAttribute("filtroPersonalizacion", estado_personalizacion);
         model.addAttribute("caja", caja);
         model.addAttribute("scope", scope);
+        model.addAttribute("pedidoVistaDataJson", pvdm.toString());
+        model.addAttribute("rol", usuario.getRol() != null ? usuario.getRol().getNombre() : "");
         return "pedidos/index";
     }
 
@@ -91,6 +102,106 @@ public class PedidoController {
         model.addAttribute("sinCaja", cajasAbiertas.isEmpty());
         model.addAttribute("scope", "todas");
         return "pedidos/index";
+    }
+
+    private String buildPedidoVistaJson(Pedido p) {
+        java.math.BigDecimal montoTotal = p.getMontoTotal() != null ? p.getMontoTotal() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal saldoPendiente = p.getMontoSaldo() != null ? p.getMontoSaldo() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal montoCancelado = montoTotal.subtract(saldoPendiente).max(java.math.BigDecimal.ZERO);
+        java.math.BigDecimal porcentajeCancelado = java.math.BigDecimal.ZERO;
+        if (montoTotal.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            porcentajeCancelado = montoCancelado.multiply(java.math.BigDecimal.valueOf(100))
+                .divide(montoTotal, 2, RoundingMode.HALF_UP).min(java.math.BigDecimal.valueOf(100));
+        }
+
+        List<Map<String, Object>> productosList = new ArrayList<>();
+        if (p.getProductos() != null) {
+            for (PedidoProducto pp : p.getProductos()) {
+                Map<String, Object> ppMap = new LinkedHashMap<>();
+                ppMap.put("nombre", pp.getNombre());
+                ppMap.put("descripcion", pp.getDescripcion() != null ? pp.getDescripcion() : "-");
+                ppMap.put("precio_unitario", pp.getPrecioUnitario() != null ? pp.getPrecioUnitario() : 0);
+                ppMap.put("cantidad", pp.getCantidad());
+                ppMap.put("total", pp.getTotal() != null ? pp.getTotal() : 0);
+                List<Map<String, Object>> archivosList = new ArrayList<>();
+                if (pp.getArchivos() != null) {
+                    for (PedidoProductoArchivo a : pp.getArchivos()) {
+                        Map<String, Object> aMap = new LinkedHashMap<>();
+                        aMap.put("nombre_original", a.getNombreOriginal() != null ? a.getNombreOriginal() : "archivo");
+                        aMap.put("url", "/uploads/" + (a.getArchivoPath() != null ? a.getArchivoPath() : ""));
+                        archivosList.add(aMap);
+                    }
+                }
+                ppMap.put("archivos", archivosList);
+                productosList.add(ppMap);
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"codigo\":\"").append(esc(p.getCodigo())).append("\",");
+        sb.append("\"nombre_producto\":\"").append(esc(p.getNombreProducto() != null ? p.getNombreProducto() : "-")).append("\",");
+        sb.append("\"descripcion\":\"").append(esc(p.getDetalleTrabajo() != null ? p.getDetalleTrabajo() : "-")).append("\",");
+        sb.append("\"nombre_cliente\":\"").append(esc(p.getNombreCliente())).append("\",");
+        sb.append("\"cliente_catalogo\":\"").append(p.getCliente() != null ? ("Cliente catalogo #" + p.getCliente().getId()) : "").append("\",");
+        sb.append("\"telefono_cliente\":\"").append(esc(p.getTelefonoCliente() != null ? p.getTelefonoCliente() : "-")).append("\",");
+        sb.append("\"documento_cliente\":\"").append(esc(p.getDocumentoCliente() != null ? p.getDocumentoCliente() : "-")).append("\",");
+        sb.append("\"correo_cliente\":\"").append(esc(p.getCorreoCliente() != null ? p.getCorreoCliente() : "-")).append("\",");
+        int cantTotal = p.getProductos() != null && !p.getProductos().isEmpty()
+            ? p.getProductos().stream().mapToInt(PedidoProducto::getCantidad).sum()
+            : (p.getCantidad() != null ? p.getCantidad() : 1);
+        sb.append("\"cantidad\":").append(cantTotal).append(",");
+        sb.append("\"productos\":").append(toJsonArray(productosList)).append(",");
+        sb.append("\"estado\":\"").append(esc(p.getEstado() != null ? p.getEstado().replace("_", " ") : "")).append("\",");
+        sb.append("\"estado_pago\":\"").append(esc((p.getEstadoPago() != null ? p.getEstadoPago() : "pendiente_adelanto").replace("_", " "))).append("\",");
+        sb.append("\"tipo_entrega\":\"").append(esc("agencia".equals(p.getTipoEntrega()) ? "Agencia" : ("delivery".equals(p.getTipoEntrega()) ? "Delivery" : "Local"))).append("\",");
+        sb.append("\"direccion_entrega\":\"").append(esc(p.getDireccionEntrega() != null ? p.getDireccionEntrega() : "-")).append("\",");
+        sb.append("\"distrito_entrega\":\"").append(esc(p.getDistritoEntrega() != null ? p.getDistritoEntrega() : "-")).append("\",");
+        sb.append("\"codigo_postal_entrega\":\"").append(esc(p.getCodigoPostalEntrega() != null ? p.getCodigoPostalEntrega() : "-")).append("\",");
+        sb.append("\"referencia_entrega\":\"").append(esc(p.getReferenciaEntrega() != null ? p.getReferenciaEntrega() : "-")).append("\",");
+        sb.append("\"nombre_recibe\":\"").append(esc(p.getNombreRecibe() != null ? p.getNombreRecibe() : "-")).append("\",");
+        sb.append("\"telefono_recibe\":\"").append(esc(p.getTelefonoRecibe() != null ? p.getTelefonoRecibe() : "-")).append("\",");
+        sb.append("\"fecha_entrega_compromiso\":\"").append(p.getFechaEntregaCompromiso() != null ? p.getFechaEntregaCompromiso().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "-").append("\",");
+        sb.append("\"monto_total\":\"").append(p.getMontoTotal() != null ? "S/ " + java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(p.getMontoTotal()) : "-").append("\",");
+        sb.append("\"monto_cancelado\":\"S/ ").append(java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(montoCancelado)).append("\",");
+        sb.append("\"monto_saldo\":\"S/ ").append(java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(saldoPendiente)).append("\",");
+        sb.append("\"porcentaje_cancelado\":\"").append(java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(porcentajeCancelado)).append("%\",");
+        sb.append("\"monto_total_raw\":").append(montoTotal).append(",");
+        sb.append("\"monto_adelanto_raw\":").append(p.getMontoAdelanto() != null ? p.getMontoAdelanto() : 0).append(",");
+        sb.append("\"monto_saldo_raw\":").append(saldoPendiente).append(",");
+        sb.append("\"tipo_pago\":\"").append(esc(p.getTipoPago() != null ? p.getTipoPago() : "dos_partes")).append("\",");
+        sb.append("\"cobro_url\":\"/pedidos/").append(p.getId()).append("/confirmar-pago-final\",");
+        sb.append("\"derivar_url\":\"/pedidos/").append(p.getId()).append("/derivar\",");
+        sb.append("\"estado_personalizacion_raw\":\"").append(esc(p.getEstadoPersonalizacion() != null ? p.getEstadoPersonalizacion() : "sin_iniciar")).append("\",");
+        sb.append("\"estado_raw\":\"").append(esc(p.getEstado())).append("\"");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String esc(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private String toJsonArray(List<Map<String, Object>> list) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("{");
+            int j = 0;
+            for (Map.Entry<String, Object> e : list.get(i).entrySet()) {
+                if (j > 0) sb.append(",");
+                sb.append("\"").append(e.getKey()).append("\":");
+                Object v = e.getValue();
+                if (v instanceof String) sb.append("\"").append(esc((String) v)).append("\"");
+                else if (v instanceof List) sb.append(toJsonArray((List<Map<String, Object>>) v));
+                else sb.append(v);
+                j++;
+            }
+            sb.append("}");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     @GetMapping("/create")

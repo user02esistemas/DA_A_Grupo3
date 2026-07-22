@@ -122,7 +122,7 @@
                                     <th:block th:if="${pedido.estado == 'listo_recoger'}">
                                         <button x-on:click="abrirEntregar([[${pedido.id}]], '[[${pedido.codigo}]]', '[[${pedido.estadoPago}]]', [[${pedido.montoTotal}]], [[${pedido.montoSaldo}]])" title="Entregar al cliente"
                                             class="btn-icon-sm bg-amber-600 hover:bg-amber-700">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m-8-4v10l8 4m0-10v10l8 4"/></svg>
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m-8-4v10l8 4m0-10v10"/></svg>
                                         </button>
                                     </th:block>
                                 </div>
@@ -138,7 +138,205 @@
 
         <div class="px-1" x-html="paginationHtml"></div>
 
-        <!-- Modales omitted for brevity - same Alpine.js modals as original -->
+        <div x-show="modalDetalle" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            x-on:keydown.escape.window="modalDetalle = false"
+            x-on:click.self="modalDetalle = false">
+            <div x-show="modalDetalle" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl border border-[#e5dec8] bg-white p-6 shadow-2xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Detalle del Pedido</h3>
+                    <button x-on:click="modalDetalle = false" class="btn-icon-sm bg-red-600 hover:bg-red-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-5 w-5">
+                    </button>
+                </div>
+                <template x-if="detallePedido">
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div><span class="font-semibold text-[#5a4a2a]">Codigo:</span> <span x-text="detallePedido.codigo" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Estado:</span> <span x-text="detallePedido.estado" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Cliente:</span> <span x-text="detallePedido.nombre_cliente" class="text-[#2d2b24]"></span></div>
+                            <div><span class="font-semibold text-[#5a4a2a]">Tipo:</span> <span x-text="detallePedido.tipo_producto" class="text-[#2d2b24]"></span></div>
+                            <div class="col-span-2"><span class="font-semibold text-[#5a4a2a]">Direccion:</span> <span x-text="detallePedido.direccion_entrega || 'No especificada'" class="text-[#2d2b24]"></span></div>
+                        </div>
+                        <div>
+                            <h4 class="mb-2 font-semibold text-[#5a4a2a]">Productos</h4>
+                            <table class="min-w-full text-xs">
+                                <thead class="bg-[#faf8f2]"><tr><th class="px-3 py-2 text-left">Producto</th><th class="px-3 py-2 text-right">Cant.</th><th class="px-3 py-2 text-right">Recoge</th></tr></thead>
+                                <tbody class="divide-y divide-[#efeee9]">
+                                    <template x-for="prod in detallePedido.productos" :key="prod.id">
+                                        <tr>
+                                            <td class="px-3 py-2" x-text="prod.nombre"></td>
+                                            <td class="px-3 py-2 text-right" x-text="prod.cantidad"></td>
+                                            <td class="px-3 py-2 text-right" x-text="prod.cantidad_recoge || prod.cantidad"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div x-show="modalRecibir" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            x-on:keydown.escape.window="modalRecibir = false"
+            x-on:click.self="modalRecibir = false">
+            <div x-show="modalRecibir" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl border border-[#e5dec8] bg-white p-6 shadow-2xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Recibir en Almacen</h3>
+                    <button x-on:click="modalRecibir = false" class="btn-icon-sm bg-red-600 hover:bg-red-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-5 w-5">
+                    </button>
+                </div>
+                <p class="mb-4 text-sm text-[#4a4026]">
+                    Recibir el pedido <strong x-text="recibirCodigo"></strong> en el almacen? Se registrara la entrada de <strong x-text="recibirCantidad"></strong> unidades al stock.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button x-on:click="modalRecibir = false"
+                        class="rounded-xl border border-[#d4cfc0] bg-white px-4 py-2 text-sm font-medium text-[#5a4a2a] hover:bg-[#f4ebd4]">
+                        Cancelar
+                    </button>
+                    <button x-on:click="confirmarRecibir()" :disabled="procesando"
+                        class="rounded-xl bg-[#059669] px-4 py-2 text-sm font-medium text-white hover:bg-[#047857] disabled:opacity-50">
+                        <span x-show="!procesando">Si, recibir</span>
+                        <span x-show="procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Procesando...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="modalEntregar" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            x-on:keydown.escape.window="modalEntregar = false"
+            x-on:click.self="modalEntregar = false">
+            <div x-show="modalEntregar" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl border border-[#e5dec8] bg-white p-6 shadow-2xl">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-[#2d2b24]">Entregar al Cliente</h3>
+                    <button x-on:click="modalEntregar = false" class="btn-icon-sm bg-red-600 hover:bg-red-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-5 w-5">
+                    </button>
+                </div>
+                <p class="mb-4 text-sm text-[#4a4026]">
+                    Entregar el pedido <strong x-text="entregarCodigo"></strong> al cliente? Se dara salida del almacen.
+                </p>
+
+                <div class="mb-4 rounded-xl border p-3"
+                    :class="entregarEstadoPago === 'pagado_completo' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+                    <p class="text-xs font-semibold uppercase tracking-wider"
+                        :class="entregarEstadoPago === 'pagado_completo' ? 'text-emerald-700' : 'text-red-700'">Estado del pago</p>
+                    <p class="mt-1 text-sm font-semibold"
+                        :class="entregarEstadoPago === 'pagado_completo' ? 'text-emerald-800' : 'text-red-800'"
+                        x-text="entregarEstadoPago === 'pagado_completo' ? 'Pagado completo' : (entregarEstadoPago === 'adelanto_pagado' ? 'Solo adelanto pagado' : 'Pendiente de pago')"></p>
+                    <template x-if="entregarEstadoPago !== 'pagado_completo'">
+                        <div>
+                            <p class="mt-1 text-xs text-red-600">Saldo pendiente: <span class="font-semibold" x-text="'S/ ' + Number(entregarSaldo).toFixed(2)"></span></p>
+                            <p class="mt-2 text-xs text-red-700 font-medium">No se puede entregar el pedido hasta que el pago este completo.</p>
+                        </div>
+                    </template>
+                    <template x-if="entregarEstadoPago === 'pagado_completo'">
+                        <p class="mt-1 text-xs text-emerald-600">Total: <span class="font-semibold" x-text="'S/ ' + Number(entregarMontoTotal).toFixed(2)"></span></p>
+                    </template>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button x-on:click="modalEntregar = false"
+                        class="rounded-xl border border-[#d4cfc0] bg-white px-4 py-2 text-sm font-medium text-[#5a4a2a] hover:bg-[#f4ebd4]">
+                        Cancelar
+                    </button>
+                    <button x-on:click="confirmarEntregar()" :disabled="procesando || entregarEstadoPago !== 'pagado_completo'"
+                        class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                        <span x-show="!procesando">Si, entregar</span>
+                        <span x-show="procesando" class="flex items-center gap-2">
+                            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Procesando...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="mostrarExito" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="mostrarExito = false"
+            x-on:click.self="mostrarExito = false">
+            <div x-show="mostrarExito" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                        <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-[#2d2b24]">Operacion exitosa</p>
+                        <p class="mt-1 text-sm text-[#4a4026]" x-text="mensajeExito"></p>
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button x-on:click="mostrarExito = false" class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="mostrarError" x-cloak x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+            x-on:keydown.escape.window="mostrarError = false"
+            x-on:click.self="mostrarError = false">
+            <div x-show="mostrarError" x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-[#2d2b24]">Error</p>
+                        <p class="mt-1 text-sm text-[#4a4026]" x-text="mensajeError"></p>
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button x-on:click="mostrarError = false" class="btn-icon-sm bg-red-600 hover:bg-red-700">
+                        <img th:src="@{/icons/cerrar.ico}" alt="Cerrar" class="h-4 w-4 object-contain pointer-events-none">
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script th:inline="javascript">
@@ -177,7 +375,7 @@
 
                 async verDetalle(pedidoId) {
                     try {
-                        const resp = await fetch('/pedidos/' + pedidoId, {
+                        const resp = await fetch('/pedidos/' + pedidoId + '?ajax=1', {
                             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                         });
                         const data = await resp.json();
@@ -198,12 +396,13 @@
                 async confirmarRecibir() {
                     this.procesando = true;
                     try {
+                        const csrfToken = document.querySelector('meta[name="_csrf"]') ? document.querySelector('meta[name="_csrf"]').getAttribute('content') : '';
                         const resp = await fetch('/almacen/pedidos/' + this.recibirId + '/recibir', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]').getAttribute('content'),
+                                'X-CSRF-TOKEN': csrfToken,
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });
@@ -234,12 +433,13 @@
                 async confirmarEntregar() {
                     this.procesando = true;
                     try {
+                        const csrfToken = document.querySelector('meta[name="_csrf"]') ? document.querySelector('meta[name="_csrf"]').getAttribute('content') : '';
                         const resp = await fetch('/almacen/pedidos/' + this.entregarId + '/entregar-cliente', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]').getAttribute('content'),
+                                'X-CSRF-TOKEN': csrfToken,
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });

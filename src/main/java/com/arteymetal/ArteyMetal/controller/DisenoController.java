@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,6 +46,7 @@ public class DisenoController {
     private final String UPLOAD_DIR = "uploads/diseno/";
 
     @GetMapping
+    @Transactional(readOnly = true)
     public String index(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String q,
@@ -90,10 +92,62 @@ public class DisenoController {
 
         Page<Pedido> pedidos = pedidoRepository.findAll(spec, pageable);
 
+        Map<Long, Map<String, Object>> modelosMap = new LinkedHashMap<>();
+        for (Pedido p : pedidos) {
+            if (p.getArchivosDiseno() != null) p.getArchivosDiseno().size();
+            if (p.getProductos() != null) {
+                p.getProductos().size();
+                for (PedidoProducto pp : p.getProductos()) {
+                    if (pp.getArchivosDiseno() != null) pp.getArchivosDiseno().size();
+                }
+            }
+            Map<String, Object> info = new LinkedHashMap<>();
+            List<PedidoDisenoArchivo> archivos = p.getArchivosDiseno() != null ? p.getArchivosDiseno() : List.of();
+            List<Map<String, Object>> refFiles = new ArrayList<>();
+            List<Map<String, Object>> disFiles = new ArrayList<>();
+            for (PedidoDisenoArchivo a : archivos) {
+                Map<String, Object> fm = new LinkedHashMap<>();
+                fm.put("nombre", a.getNombreOriginal() != null ? a.getNombreOriginal() : "archivo");
+                fm.put("url", "/uploads/" + (a.getArchivoPath() != null ? a.getArchivoPath() : ""));
+                fm.put("tipo", a.getTipo() != null ? a.getTipo() : "");
+                fm.put("tamano", a.getTamanoBytes() != null ? a.getTamanoBytes() : 0L);
+                if ("Reference".equalsIgnoreCase(a.getTipo())) {
+                    refFiles.add(fm);
+                } else {
+                    disFiles.add(fm);
+                }
+            }
+            info.put("modelosRef", refFiles);
+            info.put("modelosDis", disFiles);
+
+            List<Map<String, Object>> prods = new ArrayList<>();
+            if (p.getProductos() != null) {
+                for (PedidoProducto pp : p.getProductos()) {
+                    Map<String, Object> pm = new LinkedHashMap<>();
+                    pm.put("id", pp.getId());
+                    pm.put("nombre", pp.getNombre() != null ? pp.getNombre() : "");
+                    int countDiseno = 0;
+                    int countRef = 0;
+                    if (pp.getArchivosDiseno() != null) {
+                        for (PedidoDisenoArchivo da : pp.getArchivosDiseno()) {
+                            if ("Reference".equalsIgnoreCase(da.getTipo())) countRef++;
+                            else countDiseno++;
+                        }
+                    }
+                    pm.put("countDiseno", countDiseno);
+                    pm.put("countRef", countRef);
+                    prods.add(pm);
+                }
+            }
+            info.put("productos", prods);
+            modelosMap.put(p.getId(), info);
+        }
+
         model.addAttribute("pedidos", pedidos);
         model.addAttribute("busqueda", q);
         model.addAttribute("filtroEstado", filtroEstado);
         model.addAttribute("titulo", "Diseños");
+        model.addAttribute("modelosMap", modelosMap);
 
         return "diseno/index";
     }

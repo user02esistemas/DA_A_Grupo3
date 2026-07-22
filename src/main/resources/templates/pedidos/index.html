@@ -50,9 +50,22 @@
             montoRecibido: 0,
             filtrosAbiertos: false,
             selectorCajaAbierto: false,
-            sinCajaAbierto: false
-        }" x-init="selectorCajaAbierto=$el.dataset.selector==='true'; sinCajaAbierto=$el.dataset.sinCaja==='true'"
-        th:attr="data-selector=${cajasAbiertas != null and !cajasAbiertas.isEmpty()},data-sin-caja=${sinCaja != null and sinCaja}" class="space-y-3">
+            sinCajaAbierto: false,
+            pedidoVistaData: {},
+            abrirPedidoVista(id) {
+                const raw = this.pedidoVistaData[id];
+                if (raw) { this.pedidoVista = JSON.parse(raw); this.modalPedido = true; }
+            },
+            abrirCobro(id) {
+                const raw = this.pedidoVistaData[id];
+                if (raw) { this.cobroData = JSON.parse(raw); this.modalCobro = true; }
+            },
+            abrirDerivar(id) {
+                const raw = this.pedidoVistaData[id];
+                if (raw) { this.derivarData = JSON.parse(raw); this.modalDerivar = true; }
+            }
+        }" x-init="pedidoVistaData = JSON.parse($el.dataset.pvdata || '{}'); selectorCajaAbierto=$el.dataset.selector==='true'; sinCajaAbierto=$el.dataset.sinCaja==='true'"
+        th:attr="data-pvdata=${pedidoVistaDataJson},data-selector=${cajasAbiertas != null and !cajasAbiertas.isEmpty()},data-sin-caja=${sinCaja != null and sinCaja}" class="space-y-3">
         <div class="rounded-2xl border border-[#e5dec8] bg-white p-4 shadow-sm">
             <div class="flex items-center gap-2">
                 <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -168,45 +181,57 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="min-w-[210px]">
-                                    <p class="text-xs font-semibold text-[#5a4a2a]" th:text="${#numbers.formatDecimal(pedido.porcentajeCancelado, 1, 2)} + '% cancelado'"></p>
+                                    <p class="text-xs font-semibold text-[#5a4a2a]">
+                                        <th:block th:with="mt=${pedido.montoTotal ?: T(java.math.BigDecimal).ZERO}, ms=${pedido.montoSaldo ?: T(java.math.BigDecimal).ZERO}, mc=${mt.subtract(ms).max(T(java.math.BigDecimal).ZERO)}, pc=${mt.compareTo(T(java.math.BigDecimal).ZERO) > 0 ? mc.multiply(T(java.math.BigDecimal).valueOf(100)).divide(mt, 2, T(java.math.RoundingMode).HALF_UP).min(T(java.math.BigDecimal).valueOf(100)) : T(java.math.BigDecimal).ZERO}">
+                                            <span th:text="${#numbers.formatDecimal(pc, 1, 2)}"></span>% cancelado
+                                        </th:block>
+                                    </p>
                                     <div class="mt-1 h-2 overflow-hidden rounded-full bg-[#efe7d2]">
-                                        <div class="h-full rounded-full bg-[#8a6a2e]" th:style="'width: ' + ${pedido.porcentajeCancelado} + '%'"></div>
+                                        <th:block th:with="mt=${pedido.montoTotal ?: T(java.math.BigDecimal).ZERO}, ms=${pedido.montoSaldo ?: T(java.math.BigDecimal).ZERO}, mc=${mt.subtract(ms).max(T(java.math.BigDecimal).ZERO)}, pc=${mt.compareTo(T(java.math.BigDecimal).ZERO) > 0 ? mc.multiply(T(java.math.BigDecimal).valueOf(100)).divide(mt, 2, T(java.math.RoundingMode).HALF_UP).min(T(java.math.BigDecimal).valueOf(100)) : T(java.math.BigDecimal).ZERO}">
+                                            <div class="h-full rounded-full bg-[#8a6a2e]" th:style="'width: ' + ${pc} + '%'"></div>
+                                        </th:block>
                                     </div>
                                     <p class="mt-1 text-[11px] text-[#6e6e6e]">
-                                        Cancelado: S/ <span th:text="${#numbers.formatDecimal(pedido.montoCancelado, 1, 2)}"></span> | Falta: S/ <span th:text="${#numbers.formatDecimal(pedido.saldoPendiente, 1, 2)}"></span>
+                                        <th:block th:with="mt=${pedido.montoTotal ?: T(java.math.BigDecimal).ZERO}, ms=${pedido.montoSaldo ?: T(java.math.BigDecimal).ZERO}, mc=${mt.subtract(ms).max(T(java.math.BigDecimal).ZERO)}">
+                                            Cancelado: S/ <span th:text="${#numbers.formatDecimal(mc, 1, 2)}"></span> | Falta: S/ <span th:text="${#numbers.formatDecimal(ms, 1, 2)}"></span>
+                                        </th:block>
                                     </p>
                                 </div>
                             </td>
                             <td class="px-4 py-3 text-[#4a4026]" th:text="${pedido.fechaEntregaCompromiso != null ? #temporals.format(pedido.fechaEntregaCompromiso, 'dd/MM/yyyy') : '-'}"></td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-end gap-2">
-                                    <div th:if="${#sets.contains({'administrador','vendedor'}, rol) and pedido.estado != 'en_almacen' and pedido.estadoPago == 'adelanto_pagado' and (pedido.montoSaldo != null and pedido.montoSaldo > 0)}">
-                                        <a th:href="@{/pedidos/{id}(id=${pedido.id})}"
-                                            class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700"
-                                            title="Cobrar 50%">
-                                            <img th:src="@{/icons/cobro-blanco.png}" class="h-4 w-4 object-contain pointer-events-none" alt="Cobrar">
-                                        </a>
-                                    </div>
+                                    <th:block th:with="canCobrar=${#sets.contains({'administrador','vendedor'}, rol) and pedido.estado != 'en_almacen' and pedido.estadoPago == 'adelanto_pagado' and pedido.montoSaldo != null and pedido.montoSaldo.compareTo(T(java.math.BigDecimal).ZERO) > 0}">
+                                        <div th:if="${canCobrar}">
+                                            <button type="button"
+                                                @click="abrirCobro(${pedido.id})"
+                                                class="btn-icon-sm bg-emerald-600 hover:bg-emerald-700"
+                                                title="Cobrar 50%">
+                                                <img th:src="@{/icons/cobro-blanco.png}" class="h-4 w-4 object-contain pointer-events-none" alt="Cobrar">
+                                            </button>
+                                        </div>
+                                    </th:block>
                                     <div th:if="${#sets.contains({'administrador','vendedor'}, rol)}">
-                                        <a th:href="@{/pedidos/{id}(id=${pedido.id})}"
+                                        <button type="button"
+                                            @click="abrirDerivar(${pedido.id})"
                                             class="btn-icon-sm" style="background-color:#7c3aed"
                                             title="Derivar">
                                             <img th:src="@{/icons/Derivar-Blanco.png}" class="h-4 w-4 object-contain pointer-events-none" alt="Derivar">
-                                        </a>
+                                        </button>
                                     </div>
                                     <div sec:authorize="hasAuthority('pedidos.ver')">
-                                        <a th:href="@{/pedidos/{id}(id=${pedido.id})}"
+                                        <button type="button"
+                                            @click="abrirPedidoVista(${pedido.id})"
                                             class="btn-icon-sm" style="background-color:#0891B2"
-                                            title="Ver detalle"
-                                        >
+                                            title="Ver detalle">
                                             <img th:src="@{/icons/ver-detalle.ico}" alt="Ver detalle" class="h-4 w-4 object-contain pointer-events-none" />
-                                        </a>
+                                        </button>
                                     </div>
                                     <div sec:authorize="hasAuthority('pedidos.gestionar')">
                                         <a th:href="@{/pedidos/{id}/edit(id=${pedido.id})}" class="btn-icon-sm bg-amber-400 hover:bg-amber-500" title="Editar">
                                             <img th:src="@{/icons/editar.ico}" alt="Editar" class="h-4 w-4 object-contain pointer-events-none" />
                                         </a>
-                                        <form method="POST" th:action="@{/pedidos/{id}/eliminar(id=${pedido.id})}" style="display:inline">
+                                        <form method="POST" th:action="@{/pedidos/{id}/eliminar(id=${pedido.id})}" style="display:inline" onsubmit="return confirm('Deseas eliminar este pedido?')">
                                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                                             <button type="submit" class="btn-icon-sm bg-red-600 hover:bg-red-700" title="Eliminar">
                                                 <img th:src="@{/icons/eliminar-desactivar.ico}" alt="Eliminar" class="h-4 w-4 object-contain pointer-events-none" />

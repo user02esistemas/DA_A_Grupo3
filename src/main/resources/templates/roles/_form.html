@@ -8,8 +8,8 @@
     <div>
         <label for="activo" class="mb-2 block text-sm font-medium text-[#4d4026]">Estado</label>
         <select id="activo" name="activo" class="block w-full rounded-xl border border-[#d1be8a] bg-[#fffdf7] px-4 py-3 text-[#251e12]">
-            <option value="1" th:selected="${activoRol == 1}">Activo</option>
-            <option value="0" th:selected="${activoRol == 0}">Inactivo</option>
+            <option value="1" th:selected="${rol != null ? rol.activo == true : true}">Activo</option>
+            <option value="0" th:selected="${rol != null and rol.activo == false}">Inactivo</option>
         </select>
         <p th:if="${#fields.hasErrors('activo')}" th:errors="activo" class="mt-1 text-sm text-rose-600"></p>
     </div>
@@ -25,7 +25,7 @@
     <p class="mb-2 block text-sm font-medium text-[#4d4026]">Permisos del rol</p>
     <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         <label th:each="permiso : ${permisos}" class="flex items-center gap-2 rounded-xl border border-[#e5dec8] bg-[#fffdf7] px-3 py-2 text-sm text-[#3f3420]">
-            <input type="checkbox" name="permisos" th:value="${permiso.id}" th:checked="${#lists.contains(seleccionados, permiso.id)}" class="rounded border-[#b9943d] text-[#b9943d] focus:ring-[#b9943d]" />
+            <input type="checkbox" name="permisos" th:value="${permiso.id}" th:checked="${rol != null and rol.permisos != null and rol.permisos.![id].contains(permiso.id)}" class="rounded border-[#b9943d] text-[#b9943d] focus:ring-[#b9943d]" />
             <span th:text="${permiso.nombre}"></span>
         </label>
     </div>
